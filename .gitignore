@@ -1,0 +1,30 @@
+# Build artifacts
+/target/
+**/target/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Benchmark results
+*.json
+!.github/
+qluelessbench_*.json
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.*
+
+# Release binaries (keep source)
+/release/

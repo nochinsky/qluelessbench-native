@@ -1,0 +1,86 @@
+[package]
+name = "qluelessbench-native"
+version = "0.1.0"
+edition = "2021"
+authors = ["QlueLess Team"]
+description = "Cross-platform system benchmark tool written in Rust"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/nochinsky/qluelessbench-native"
+keywords = ["benchmark", "performance", "system", "testing"]
+categories = ["development-tools::profiling", "command-line-utilities"]
+
+[dependencies]
+# CLI parsing
+clap = { version = "4.4", features = ["derive"] }
+
+# Progress bars and terminal formatting
+indicatif = "0.17"
+console = "0.15"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Database
+rusqlite = { version = "0.30", features = ["bundled"] }
+
+# Image processing
+image = "0.24"
+
+# Compression
+flate2 = "1.0"
+zip = "0.6"
+tar = "0.4"
+
+# Text processing
+regex = "1.10"
+base64 = "0.22"
+
+# Math and arrays
+ndarray = "0.15"
+rand = "0.8"
+
+# Hardware detection
+sysinfo = "0.30"
+
+# Cross-platform directories
+dirs = "5.0"
+tempfile = "3.9"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Time and dates
+chrono = { version = "0.4", features = ["serde"] }
+
+# Parallel processing
+rayon = "1.8"
+
+# Cryptography (AES encryption benchmark)
+aes = "0.8"
+sha2 = "0.10"
+ctr = "0.9"
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bin]]
+name = "qluelessbench"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "unwind"
+strip = true
+
+[profile.bench]
+opt-level = 3
+lto = true
