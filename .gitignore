@@ -28,3 +28,6 @@ qluelessbench_*.json
 
 # Release binaries (keep source)
 /release/
+
+# Windows special files
+nul
