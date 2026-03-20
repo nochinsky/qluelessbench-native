@@ -297,4 +297,85 @@ mod tests {
         assert_eq!(img.width(), 100);
         assert_eq!(img.height(), 100);
     }
+
+    #[test]
+    fn test_generate_test_images() {
+        let images = ImageProcessingBenchmark::generate_test_images(100, 100, 4);
+        assert_eq!(images.len(), 4);
+        for img in &images {
+            assert_eq!(img.width(), 100);
+            assert_eq!(img.height(), 100);
+        }
+    }
+
+    #[test]
+    fn test_resize() {
+        let img = ImageProcessingBenchmark::generate_test_image(1024, 1024);
+        let result = ImageProcessingBenchmark::test_resize(&img);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_blur() {
+        let img = ImageProcessingBenchmark::generate_test_image(512, 512);
+        let result = ImageProcessingBenchmark::test_blur(&img);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_sharpen() {
+        let img = ImageProcessingBenchmark::generate_test_image(512, 512);
+        let result = ImageProcessingBenchmark::test_sharpen(&img);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_format_conversion() {
+        let img = ImageProcessingBenchmark::generate_test_image(256, 256);
+        let result = ImageProcessingBenchmark::test_format_conversion(&img);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_multi_core_benchmark_creation() {
+        let single = ImageProcessingBenchmark::new();
+        let multi = ImageProcessingBenchmark::new_multi_core();
+        assert_eq!(single.category_name(), multi.category_name());
+    }
+
+    #[test]
+    fn test_parallel_resize() {
+        let images = ImageProcessingBenchmark::generate_test_images(512, 512, 4);
+        let result = ImageProcessingBenchmark::test_parallel_resize(&images);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_parallel_blur() {
+        let images = ImageProcessingBenchmark::generate_test_images(256, 256, 4);
+        let result = ImageProcessingBenchmark::test_parallel_blur(&images);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_parallel_sharpen() {
+        let images = ImageProcessingBenchmark::generate_test_images(256, 256, 4);
+        let result = ImageProcessingBenchmark::test_parallel_sharpen(&images);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_parallel_format_conversion() {
+        let images = ImageProcessingBenchmark::generate_test_images(256, 256, 4);
+        let result = ImageProcessingBenchmark::test_parallel_format_conversion(&images);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
 }

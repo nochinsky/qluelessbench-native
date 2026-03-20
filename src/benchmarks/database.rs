@@ -602,4 +602,82 @@ mod tests {
         assert!(result.is_ok());
         assert!(result.unwrap() > 0.0);
     }
+
+    #[test]
+    fn test_search() {
+        let result = DatabaseBenchmark::test_search();
+        assert!(result.is_ok());
+        let ops = result.unwrap();
+        assert!(ops > 0.0, "Search should return positive operations/sec");
+    }
+
+    #[test]
+    fn test_updates() {
+        let result = DatabaseBenchmark::test_updates();
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_deletes() {
+        let result = DatabaseBenchmark::test_deletes();
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_indexed_lookup() {
+        let result = DatabaseBenchmark::test_indexed_lookup();
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_create_connection() {
+        let conn = DatabaseBenchmark::create_connection();
+        assert!(conn.is_ok());
+    }
+
+    #[test]
+    fn test_multi_core_benchmark_creation() {
+        let single = DatabaseBenchmark::new();
+        let multi = DatabaseBenchmark::new_multi_core();
+        assert_eq!(single.category_name(), multi.category_name());
+        assert_eq!(single.weight(), multi.weight());
+    }
+
+    #[test]
+    fn test_parallel_bulk_insert() {
+        let result = DatabaseBenchmark::test_parallel_bulk_insert(2, 500);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_parallel_search() {
+        let result = DatabaseBenchmark::test_parallel_search(2, 1000);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_parallel_updates() {
+        let result = DatabaseBenchmark::test_parallel_updates(2, 100);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_parallel_deletes() {
+        let result = DatabaseBenchmark::test_parallel_deletes(2, 100);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_parallel_indexed_lookup() {
+        let result = DatabaseBenchmark::test_parallel_indexed_lookup(2);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
 }

@@ -404,4 +404,46 @@ mod tests {
         assert!(result.is_ok());
         assert!(result.unwrap() > 0.0);
     }
+
+    #[test]
+    fn test_statistics() {
+        let result = MathematicalBenchmark::test_statistics();
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_multi_core_benchmark_creation() {
+        let single = MathematicalBenchmark::new();
+        let multi = MathematicalBenchmark::new_multi_core();
+        assert_eq!(single.category_name(), multi.category_name());
+    }
+
+    #[test]
+    fn test_parallel_array_ops() {
+        let result = MathematicalBenchmark::test_parallel_array_ops(2);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_parallel_matrix_multiplication() {
+        let result = MathematicalBenchmark::test_parallel_matrix_multiplication(2);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_parallel_statistics() {
+        let result = MathematicalBenchmark::test_parallel_statistics(2);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_parallel_prime_generation() {
+        let result = MathematicalBenchmark::test_parallel_prime_generation(2);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
 }

@@ -338,4 +338,75 @@ mod tests {
         let data = CompressionBenchmark::generate_test_data(1);
         assert_eq!(data.len(), 1024 * 1024);
     }
+
+    #[test]
+    fn test_zip_level_1() {
+        let data = CompressionBenchmark::generate_test_data(1);
+        let result = CompressionBenchmark::test_zip_level_1(&data);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_zip_level_6() {
+        let data = CompressionBenchmark::generate_test_data(1);
+        let result = CompressionBenchmark::test_zip_level_6(&data);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_zip_level_9() {
+        let data = CompressionBenchmark::generate_test_data(1);
+        let result = CompressionBenchmark::test_zip_level_9(&data);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_gzip() {
+        let data = CompressionBenchmark::generate_test_data(1);
+        let result = CompressionBenchmark::test_gzip(&data);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_multi_core_benchmark_creation() {
+        let single = CompressionBenchmark::new();
+        let multi = CompressionBenchmark::new_multi_core();
+        assert_eq!(single.category_name(), multi.category_name());
+    }
+
+    #[test]
+    fn test_parallel_zip_level_1() {
+        let data = CompressionBenchmark::generate_test_data(1);
+        let result = CompressionBenchmark::test_parallel_zip_level_1(&data, 2);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_parallel_zip_level_6() {
+        let data = CompressionBenchmark::generate_test_data(1);
+        let result = CompressionBenchmark::test_parallel_zip_level_6(&data, 2);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_parallel_zip_level_9() {
+        let data = CompressionBenchmark::generate_test_data(1);
+        let result = CompressionBenchmark::test_parallel_zip_level_9(&data, 2);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_parallel_gzip() {
+        let data = CompressionBenchmark::generate_test_data(1);
+        let result = CompressionBenchmark::test_parallel_gzip(&data, 2);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
 }

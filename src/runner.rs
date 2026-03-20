@@ -426,5 +426,11 @@ impl BenchmarkRunner {
 
 /// Get the Rust compiler version.
 fn get_rust_version() -> String {
-    env!("CARGO_PKG_VERSION").to_string()
+    std::process::Command::new("rustc")
+        .arg("--version")
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string())
 }

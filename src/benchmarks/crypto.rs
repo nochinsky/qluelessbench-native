@@ -187,3 +187,71 @@ impl BaseBenchmark for CryptoBenchmark {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_crypto_category_name() {
+        let benchmark = CryptoBenchmark::new();
+        assert_eq!(benchmark.category_name(), "Cryptography");
+    }
+
+    #[test]
+    fn test_crypto_weight() {
+        let benchmark = CryptoBenchmark::new();
+        assert_eq!(benchmark.weight(), 1.2);
+    }
+
+    #[test]
+    fn test_aes_encrypt_returns_positive() {
+        let result = CryptoBenchmark::test_aes_encrypt(1);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_sha256_returns_positive() {
+        let result = CryptoBenchmark::test_sha256(1);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_aes_encrypt_larger_data() {
+        let result = CryptoBenchmark::test_aes_encrypt(10);
+        assert!(result.is_ok());
+        let throughput = result.unwrap();
+        assert!(throughput > 0.0, "Throughput should be positive");
+    }
+
+    #[test]
+    fn test_sha256_larger_data() {
+        let result = CryptoBenchmark::test_sha256(10);
+        assert!(result.is_ok());
+        let throughput = result.unwrap();
+        assert!(throughput > 0.0, "Throughput should be positive");
+    }
+
+    #[test]
+    fn test_multi_core_benchmark_creation() {
+        let single = CryptoBenchmark::new();
+        let multi = CryptoBenchmark::new_multi_core();
+        assert_eq!(single.category_name(), multi.category_name());
+    }
+
+    #[test]
+    fn test_parallel_aes_encrypt() {
+        let result = CryptoBenchmark::test_parallel_aes_encrypt(4, 5);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_parallel_sha256() {
+        let result = CryptoBenchmark::test_parallel_sha256(4, 5);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+}
