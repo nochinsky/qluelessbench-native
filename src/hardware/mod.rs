@@ -45,9 +45,6 @@ fn get_platform_release() -> String {
 
 /// Get GPU information.
 fn get_gpu_info() -> Option<String> {
-    // This is a simplified implementation
-    // A full implementation would use platform-specific APIs
-
     #[cfg(target_os = "windows")]
     {
         return get_windows_gpu();
@@ -67,9 +64,53 @@ fn get_gpu_info() -> Option<String> {
     None
 }
 
+// ---------------------------------------------------------------------------
+// Windows GPU detection
+// ---------------------------------------------------------------------------
+
 #[cfg(target_os = "windows")]
 fn get_windows_gpu() -> Option<String> {
-    // Try wmic command (available on all Windows versions)
+    // Strategy 1: PowerShell — available on Windows 10+ by default
+    // Try Get-CimInstance first (wmic is deprecated since Windows 10 21H1)
+    if let Some(gpu) = get_windows_gpu_powershell() {
+        return Some(gpu);
+    }
+
+    // Strategy 2: wmic fallback — still present on most installs,
+    // may be absent on fresh Windows 11 installs
+    if let Some(gpu) = get_windows_gpu_wmic() {
+        return Some(gpu);
+    }
+
+    None
+}
+
+#[cfg(target_os = "windows")]
+fn get_windows_gpu_powershell() -> Option<String> {
+    std::process::Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name | Select-Object -First 1",
+        ])
+        .output()
+        .ok()
+        .and_then(|output| {
+            if !output.status.success() {
+                return None;
+            }
+            let stdout = String::from_utf8(output.stdout).ok()?;
+            let name = stdout.trim().to_string();
+            if name.is_empty() {
+                None
+            } else {
+                Some(name)
+            }
+        })
+}
+
+#[cfg(target_os = "windows")]
+fn get_windows_gpu_wmic() -> Option<String> {
     std::process::Command::new("wmic")
         .args(["path", "win32_VideoController", "get", "name"])
         .output()
@@ -84,11 +125,31 @@ fn get_windows_gpu() -> Option<String> {
         })
 }
 
+// ---------------------------------------------------------------------------
+// Linux GPU detection
+// ---------------------------------------------------------------------------
+
 #[cfg(target_os = "linux")]
 fn get_linux_gpu() -> Option<String> {
-    // Try to get GPU from lspci
+    // Strategy 1: lspci -nn (machine-parseable, available on most distros)
+    if let Some(gpu) = get_linux_gpu_lspci() {
+        return Some(gpu);
+    }
+
+    // Strategy 2: /sys/class/drm fallback
+    if let Some(gpu) = get_linux_gpu_sysfs() {
+        return Some(gpu);
+    }
+
+    None
+}
+
+#[cfg(target_os = "linux")]
+fn get_linux_gpu_lspci() -> Option<String> {
+    // lspci -nn gives concise output like:
+    // 01:00.0 VGA compatible controller [0300]: NVIDIA Corporation ... [10de:xxxx] (rev a1)
     std::process::Command::new("lspci")
-        .arg("-v")
+        .arg("-nn")
         .output()
         .ok()
         .and_then(|output| String::from_utf8(output.stdout).ok())
@@ -96,23 +157,65 @@ fn get_linux_gpu() -> Option<String> {
             output
                 .lines()
                 .find(|line| {
-                    line.to_lowercase().contains("vga") || line.to_lowercase().contains("3d")
+                    let lower = line.to_lowercase();
+                    lower.contains("vga compatible controller")
+                        || lower.contains("3d controller")
+                        || lower.contains("display controller")
                 })
                 .map(|line| {
-                    // Extract GPU name after the colon
-                    line.split(':')
-                        .nth(1)
-                        .map(|s| s.trim().to_string())
-                        .unwrap_or_default()
+                    // Format: "01:00.0 VGA compatible controller [0300]: NVIDIA Corporation ... [10de:xxxx]"
+                    // Extract everything between the first colon and the PCI ID brackets
+                    let after_first_colon = line.split(':').skip(1).collect::<Vec<_>>().join(":");
+                    let after_first_colon = after_first_colon.trim();
+                    // Strip trailing PCI ID like "[10de:2684]" and revision "(rev a1)"
+                    let cleaned = after_first_colon
+                        .split('[')
+                        .next()
+                        .unwrap_or(after_first_colon)
+                        .trim();
+                    // Remove trailing "(rev ...)" if present
+                    let cleaned = if let Some(pos) = cleaned.rfind("(rev") {
+                        cleaned[..pos].trim()
+                    } else {
+                        cleaned
+                    };
+                    cleaned.to_string()
                 })
         })
 }
 
+#[cfg(target_os = "linux")]
+fn get_linux_gpu_sysfs() -> Option<String> {
+    // Read GPU name from /sys/class/drm/card0/device/gpu_name or similar
+    std::fs::read_to_string("/sys/class/drm/card0/device/gpu_name")
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
+// ---------------------------------------------------------------------------
+// macOS GPU detection
+// ---------------------------------------------------------------------------
+
 #[cfg(target_os = "macos")]
 fn get_macos_gpu() -> Option<String> {
-    // Use system_profiler
+    // Strategy 1: system_profiler (comprehensive but slow ~200ms)
+    if let Some(gpu) = get_macos_gpu_system_profiler() {
+        return Some(gpu);
+    }
+
+    // Strategy 2: ioreg (faster ~50ms)
+    if let Some(gpu) = get_macos_gpu_ioreg() {
+        return Some(gpu);
+    }
+
+    None
+}
+
+#[cfg(target_os = "macos")]
+fn get_macos_gpu_system_profiler() -> Option<String> {
     std::process::Command::new("system_profiler")
-        .arg("SPDisplaysDataType")
+        .args(["SPDisplaysDataType", "-detailLevel", "mini"])
         .output()
         .ok()
         .and_then(|output| String::from_utf8(output.stdout).ok())
@@ -128,6 +231,30 @@ fn get_macos_gpu() -> Option<String> {
                 })
         })
 }
+
+#[cfg(target_os = "macos")]
+fn get_macos_gpu_ioreg() -> Option<String> {
+    std::process::Command::new("ioreg")
+        .args(["-l", "-n", "AGXAccelerator", "-r"])
+        .output()
+        .ok()
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .and_then(|output| {
+            output
+                .lines()
+                .find(|line| line.contains("\"model\""))
+                .and_then(|line| {
+                    line.split('=')
+                        .nth(1)
+                        .map(|s| s.trim().trim_matches('"').to_string())
+                })
+                .filter(|s| !s.is_empty())
+        })
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -146,5 +273,37 @@ mod tests {
         let info = get_system_info();
         assert!(info.cpu.is_some());
         assert!(!info.cpu.as_ref().unwrap().is_empty());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn test_windows_gpu_detection() {
+        // At least one of the two strategies should work on a Windows machine with a GPU
+        let gpu = get_windows_gpu();
+        // We can't assert it's Some in CI (no GPU), but we can verify no panic
+        let _ = gpu;
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn test_powershell_command_runs() {
+        // Verify PowerShell command doesn't crash even if no GPU found
+        let result = get_windows_gpu_powershell();
+        let _ = result;
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_linux_gpu_detection() {
+        let gpu = get_linux_gpu();
+        // On CI (no GPU) this will be None, on dev machines with GPU it should be Some
+        let _ = gpu;
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn test_macos_gpu_detection() {
+        let gpu = get_macos_gpu();
+        let _ = gpu;
     }
 }
