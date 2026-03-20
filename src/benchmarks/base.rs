@@ -45,24 +45,20 @@ pub trait BaseBenchmark {
     ) -> Result<crate::results::CategoryResult>;
 }
 
-/// Run a benchmark test with iterations and warmup.
-///
-/// # Arguments
-///
-/// * `test_fn` - The test function to run (returns the metric value)
-/// * `name` - Name of the test
-/// * `reference_value` - Reference value for scoring (higher = better performance)
-/// * `iterations` - Number of measured iterations
-/// * `warmup` - Number of warmup iterations (discarded)
-/// * `timeout` - Timeout in seconds
-///
-/// # Returns
-///
-/// A TestResult with statistics and score.
-pub fn run_with_iterations<F>(
+/// Scoring direction for benchmark tests.
+pub enum ScoringMode {
+    /// Higher metric values mean better performance (e.g., throughput in MB/s).
+    HigherIsBetter,
+    /// Lower metric values mean better performance (e.g., duration in seconds).
+    LowerIsBetter,
+}
+
+/// Core iteration runner shared by all scoring modes.
+fn run_iterations_core<F>(
     test_fn: F,
     name: &str,
     reference_value: f64,
+    scoring_mode: ScoringMode,
     iterations: usize,
     warmup: usize,
     timeout: u64,
@@ -121,12 +117,57 @@ where
     result.cv = calculate_coefficient_of_variation(&values);
     result.reliability = get_reliability(result.cv);
 
-    // Calculate score based on median value
-    // Higher value = better performance = higher score
-    // Score = (median / reference) * 1000 (no cap - scores reflect actual performance)
-    result.score = (result.median / reference_value) * 1000.0;
+    // Calculate score based on median value and scoring mode
+    match scoring_mode {
+        ScoringMode::HigherIsBetter => {
+            result.score = (result.median / reference_value) * 1000.0;
+        }
+        ScoringMode::LowerIsBetter => {
+            result.score = if result.median > 0.0 {
+                (reference_value / result.median) * 1000.0
+            } else {
+                1000.0
+            };
+        }
+    }
 
     result
+}
+
+/// Run a benchmark test with iterations and warmup.
+///
+/// # Arguments
+///
+/// * `test_fn` - The test function to run (returns the metric value)
+/// * `name` - Name of the test
+/// * `reference_value` - Reference value for scoring (higher = better performance)
+/// * `iterations` - Number of measured iterations
+/// * `warmup` - Number of warmup iterations (discarded)
+/// * `timeout` - Timeout in seconds
+///
+/// # Returns
+///
+/// A TestResult with statistics and score.
+pub fn run_with_iterations<F>(
+    test_fn: F,
+    name: &str,
+    reference_value: f64,
+    iterations: usize,
+    warmup: usize,
+    timeout: u64,
+) -> TestResult
+where
+    F: Fn() -> Result<f64>,
+{
+    run_iterations_core(
+        test_fn,
+        name,
+        reference_value,
+        ScoringMode::HigherIsBetter,
+        iterations,
+        warmup,
+        timeout,
+    )
 }
 
 /// Run a benchmark test where lower values are better (e.g., duration).
@@ -141,69 +182,17 @@ pub fn run_with_iterations_lower_is_better<F>(
     timeout: u64,
 ) -> TestResult
 where
-    F: Fn() -> Result<f64> + Clone,
+    F: Fn() -> Result<f64>,
 {
-    let mut result = TestResult::new(name.to_string());
-    let mut values: Vec<f64> = Vec::with_capacity(iterations);
-    let start_time = Instant::now();
-    let deadline = start_time + Duration::from_secs(timeout);
-
-    // Warmup iterations
-    for _ in 0..warmup {
-        if let Err(e) = test_fn() {
-            eprintln!("Warning: warmup iteration failed: {}", e);
-        }
-    }
-
-    // Measured iterations
-    for i in 0..iterations {
-        // Check timeout against overall deadline
-        if Instant::now() > deadline {
-            result.passed = false;
-            result.error = Some(format!("Timeout on iteration {}", i));
-            break;
-        }
-
-        match test_fn() {
-            Ok(value) => values.push(value),
-            Err(e) => {
-                result.passed = false;
-                result.error = Some(e.to_string());
-                break;
-            }
-        }
-    }
-
-    result.duration = start_time.elapsed().as_secs_f64();
-    result.iterations = values.len();
-
-    if values.is_empty() {
-        result.score = 0.0;
-        result.median = 0.0;
-        result.p95 = 0.0;
-        result.p99 = 0.0;
-        result.cv = 0.0;
-        result.reliability = Reliability::Unknown;
-        return result;
-    }
-
-    // Calculate statistics
-    result.median = calculate_median(&values);
-    result.p95 = calculate_percentile(&values, 95.0);
-    result.p99 = calculate_percentile(&values, 99.0);
-    result.cv = calculate_coefficient_of_variation(&values);
-    result.reliability = get_reliability(result.cv);
-
-    // Calculate score based on median value
-    // Lower value = better performance = higher score
-    // Score = (reference / median) * 1000 (no cap - scores reflect actual performance)
-    if result.median > 0.0 {
-        result.score = (reference_value / result.median) * 1000.0;
-    } else {
-        result.score = 1000.0;
-    }
-
-    result
+    run_iterations_core(
+        test_fn,
+        name,
+        reference_value,
+        ScoringMode::LowerIsBetter,
+        iterations,
+        warmup,
+        timeout,
+    )
 }
 
 /// Format bytes to human-readable string.

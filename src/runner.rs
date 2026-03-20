@@ -9,10 +9,10 @@ use indicatif::{ProgressBar, ProgressStyle};
 use std::time::Instant;
 
 use crate::benchmarks::{
-    ArchiveBenchmark, BaseBenchmark, CompressionBenchmark, CryptoBenchmark, DatabaseBenchmark,
-    FileIOBenchmark, ImageFiltersBenchmark, ImageProcessingBenchmark, MLInferenceBenchmark,
-    MathematicalBenchmark, MemoryBenchmark, NavigationBenchmark, RayTracingBenchmark,
-    TextProcessingBenchmark,
+    ArchiveBenchmark, BaseBenchmark, CompressionBenchmark, ConcurrentBenchmark, CryptoBenchmark,
+    DatabaseBenchmark, FileIOBenchmark, ImageFiltersBenchmark, ImageProcessingBenchmark,
+    MLInferenceBenchmark, MathematicalBenchmark, MemoryBenchmark, NavigationBenchmark,
+    RayTracingBenchmark, TextProcessingBenchmark,
 };
 use crate::config::BenchmarkConfig;
 use crate::hardware::get_system_info;
@@ -221,6 +221,11 @@ impl BenchmarkRunner {
                 "Memory",
                 Box::new(MemoryBenchmark::new()),
                 Box::new(MemoryBenchmark::new_multi_core()),
+            ),
+            (
+                "Concurrent",
+                Box::new(ConcurrentBenchmark::new()),
+                Box::new(ConcurrentBenchmark::new_multi_core()),
             ),
             (
                 "Cryptography",

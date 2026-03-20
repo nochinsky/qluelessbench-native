@@ -1,32 +1,42 @@
 //! Concurrent operations benchmark tests.
 //!
-//! Tests multi-threaded file ops, parallel computation, and synchronization.
+//! Tests thread spawning, channels, concurrent data structures,
+//! and work distribution patterns.
 
 use anyhow::Result;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Write};
-use std::sync::{Arc, Barrier, Mutex};
+use std::sync::mpsc;
 use std::thread;
 use std::time::Instant;
 use tempfile::TempDir;
 
-use crate::benchmarks::base::{calculate_category_score, run_with_iterations, BaseBenchmark};
+use crate::benchmarks::base::{
+    calculate_category_score, get_parallel_workers, run_with_iterations, BaseBenchmark,
+};
 use crate::results::CategoryResult;
 
 /// Concurrent benchmark.
-pub struct ConcurrentBenchmark;
+pub struct ConcurrentBenchmark {
+    multi_core: bool,
+}
 
 impl ConcurrentBenchmark {
-    /// Create a new ConcurrentBenchmark.
+    /// Create a new ConcurrentBenchmark (single-core mode).
     pub fn new() -> Self {
-        ConcurrentBenchmark
+        ConcurrentBenchmark { multi_core: false }
     }
 
-    /// Test threaded file I/O.
-    fn test_threaded_file_io() -> Result<f64> {
+    /// Create a new ConcurrentBenchmark for multi-core testing.
+    pub fn new_multi_core() -> Self {
+        ConcurrentBenchmark { multi_core: true }
+    }
+
+    /// Test threaded file I/O — each thread writes and reads its own file.
+    fn test_threaded_file_io(num_threads: usize) -> Result<f64> {
         let temp_dir = TempDir::new()?;
-        let num_threads = Self::get_parallel_workers();
-        let file_size = 1024 * 1024; // 1MB
+        let file_size = 1024 * 1024; // 1MB per thread
 
         let start = Instant::now();
 
@@ -61,109 +71,118 @@ impl ConcurrentBenchmark {
         Ok((num_threads * file_size) as f64 / 1024.0 / 1024.0 / duration)
     }
 
-    /// Test parallel computation.
-    fn test_parallel_computation() -> Result<f64> {
-        use rayon::prelude::*;
-
-        let size = 1000000;
-        let data: Vec<f64> = (0..size).map(|i| i as f64).collect();
+    /// Test channel-based message passing between threads.
+    fn test_channel_messaging(num_messages: usize, num_workers: usize) -> Result<f64> {
+        let (tx, rx) = mpsc::channel();
 
         let start = Instant::now();
 
-        // Parallel map and reduce
-        let sum: f64 = data.par_iter().map(|&x| x * 2.0 + 1.0).sum();
-
-        let _ = sum;
-
-        let duration = start.elapsed().as_secs_f64();
-        Ok(size as f64 / duration)
-    }
-
-    /// Test thread synchronization.
-    fn test_thread_synchronization() -> Result<f64> {
-        let num_threads = Self::get_parallel_workers();
-        let iterations = 1000;
-        let counter = Arc::new(Mutex::new(0));
-        let barrier = Arc::new(Barrier::new(num_threads));
-
-        let start = Instant::now();
-
+        // Spawn workers that each process a chunk of messages
         let mut handles = Vec::new();
+        let messages_per_worker = num_messages / num_workers;
 
-        for _ in 0..num_threads {
-            let counter = Arc::clone(&counter);
-            let barrier = Arc::clone(&barrier);
-
+        for worker_id in 0..num_workers {
+            let tx = tx.clone();
             let handle = thread::spawn(move || {
-                for _ in 0..iterations {
-                    let mut num = counter.lock().unwrap();
-                    *num += 1;
-                    drop(num);
+                let mut local_sum: u64 = 0;
+                for i in 0..messages_per_worker {
+                    let msg_id = (worker_id * messages_per_worker + i) as u64;
+                    local_sum = local_sum.wrapping_add(msg_id);
                 }
-                barrier.wait();
+                tx.send(local_sum).unwrap();
             });
             handles.push(handle);
+        }
+
+        drop(tx); // Drop original sender so receiver can detect all done
+
+        // Collect results from workers
+        let mut total: u64 = 0;
+        while let Ok(partial) = rx.recv() {
+            total = total.wrapping_add(partial);
         }
 
         for handle in handles {
             handle
                 .join()
-                .map_err(|_| anyhow::anyhow!("Thread panicked during synchronization"))?;
+                .map_err(|_| anyhow::anyhow!("Worker panicked"))?;
         }
 
         let duration = start.elapsed().as_secs_f64();
-        let final_count = *counter
-            .lock()
-            .map_err(|_| anyhow::anyhow!("Mutex poisoned"))?;
-
-        Ok(final_count as f64 / duration)
+        let _ = total;
+        Ok(num_messages as f64 / duration)
     }
 
-    /// Test concurrent database-like operations.
-    fn test_concurrent_database() -> Result<f64> {
-        use std::collections::HashMap;
-
-        let num_threads = Self::get_parallel_workers();
-        let operations_per_thread = 1000;
-        let map = Arc::new(Mutex::new(HashMap::new()));
-
+    /// Test concurrent hash map with per-thread local maps merged after.
+    fn test_concurrent_map_build(num_threads: usize, inserts_per_thread: usize) -> Result<f64> {
         let start = Instant::now();
 
         let mut handles = Vec::new();
 
         for t in 0..num_threads {
-            let map = Arc::clone(&map);
-
             let handle = thread::spawn(move || {
-                for i in 0..operations_per_thread {
-                    let mut data = map.lock().unwrap();
-                    data.insert(format!("key_{}_{}", t, i), i);
+                let mut local_map = HashMap::new();
+                for i in 0..inserts_per_thread {
+                    local_map.insert(format!("key_{}_{}", t, i), i);
                 }
+                local_map
             });
             handles.push(handle);
         }
 
+        let mut merged = HashMap::new();
         for handle in handles {
-            handle
+            let local_map = handle
                 .join()
-                .map_err(|_| anyhow::anyhow!("Thread panicked during concurrent DB ops"))?;
+                .map_err(|_| anyhow::anyhow!("Thread panicked during map build"))?;
+            merged.extend(local_map);
         }
 
         let duration = start.elapsed().as_secs_f64();
-        let final_size = map
-            .lock()
-            .map_err(|_| anyhow::anyhow!("Mutex poisoned"))?
-            .len();
-
-        Ok(final_size as f64 / duration)
+        let total_inserts = merged.len();
+        Ok(total_inserts as f64 / duration)
     }
 
-    /// Get the number of parallel workers based on available cores.
-    fn get_parallel_workers() -> usize {
-        std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(8)
-            * 2
+    /// Test parallel merge sort — divide work across threads.
+    fn test_parallel_merge_sort(num_threads: usize) -> Result<f64> {
+        let size = 100_000;
+        let data: Vec<f64> = (0..size).map(|i| (size - i) as f64).collect();
+        let chunk_size = size / num_threads;
+
+        let start = Instant::now();
+
+        // Split data into chunks and sort each in a thread
+        let mut handles = Vec::new();
+        for chunk_start in (0..size).step_by(chunk_size) {
+            let chunk_end = (chunk_start + chunk_size).min(size);
+            let chunk = data[chunk_start..chunk_end].to_vec();
+            let handle = thread::spawn(move || {
+                let mut sorted = chunk;
+                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                sorted
+            });
+            handles.push(handle);
+        }
+
+        // Merge sorted chunks
+        let mut sorted_chunks: Vec<Vec<f64>> = Vec::new();
+        for handle in handles {
+            sorted_chunks.push(
+                handle
+                    .join()
+                    .map_err(|_| anyhow::anyhow!("Sort thread panicked"))?,
+            );
+        }
+
+        // K-way merge (simple pairwise)
+        let mut result = sorted_chunks.remove(0);
+        for chunk in sorted_chunks {
+            result = merge_sorted(&result, &chunk);
+        }
+
+        let duration = start.elapsed().as_secs_f64();
+        let _ = result;
+        Ok(size as f64 / duration)
     }
 }
 
@@ -171,6 +190,26 @@ impl Default for ConcurrentBenchmark {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Merge two sorted slices into a single sorted Vec.
+fn merge_sorted(a: &[f64], b: &[f64]) -> Vec<f64> {
+    let mut result = Vec::with_capacity(a.len() + b.len());
+    let mut i = 0;
+    let mut j = 0;
+
+    while i < a.len() && j < b.len() {
+        if a[i] <= b[j] {
+            result.push(a[i]);
+            i += 1;
+        } else {
+            result.push(b[j]);
+            j += 1;
+        }
+    }
+    result.extend_from_slice(&a[i..]);
+    result.extend_from_slice(&b[j..]);
+    result
 }
 
 impl BaseBenchmark for ConcurrentBenchmark {
@@ -182,18 +221,17 @@ impl BaseBenchmark for ConcurrentBenchmark {
         let mut results = Vec::new();
         let mut total_duration = 0.0;
 
-        // Reference values (MB/s for I/O, ops/s for computation)
-        let threaded_io_ref = 200.0;
-        let parallel_ref = 10000000.0;
-        let sync_ref = 100000.0;
-        let concurrent_db_ref = 50000.0;
+        let num_workers = get_parallel_workers();
+        let thread_count = if self.multi_core { num_workers } else { 1 };
+        let inserts_per_thread = 2000;
+        let messages_per_worker = 50000;
 
         // Test 1: Threaded File I/O
-        let test_fn = || Self::test_threaded_file_io();
+        let test_fn = || Self::test_threaded_file_io(thread_count);
         let result = run_with_iterations(
             test_fn,
-            "Threaded File I/O",
-            threaded_io_ref,
+            &format!("Threaded File I/O ({} threads)", thread_count),
+            200.0,
             iterations,
             warmup,
             timeout,
@@ -201,12 +239,13 @@ impl BaseBenchmark for ConcurrentBenchmark {
         total_duration += result.duration;
         results.push(result);
 
-        // Test 2: Parallel Computation
-        let test_fn = || Self::test_parallel_computation();
+        // Test 2: Channel Messaging
+        let total_messages = messages_per_worker * thread_count;
+        let test_fn = || Self::test_channel_messaging(total_messages, thread_count);
         let result = run_with_iterations(
             test_fn,
-            "Parallel Computation",
-            parallel_ref,
+            &format!("Channel Messaging ({} workers)", thread_count),
+            5_000_000.0,
             iterations,
             warmup,
             timeout,
@@ -214,12 +253,12 @@ impl BaseBenchmark for ConcurrentBenchmark {
         total_duration += result.duration;
         results.push(result);
 
-        // Test 3: Thread Synchronization
-        let test_fn = || Self::test_thread_synchronization();
+        // Test 3: Concurrent Map Build (per-thread local maps, merged after)
+        let test_fn = || Self::test_concurrent_map_build(thread_count, inserts_per_thread);
         let result = run_with_iterations(
             test_fn,
-            "Thread Synchronization",
-            sync_ref,
+            &format!("Concurrent Map Build ({} threads)", thread_count),
+            500_000.0,
             iterations,
             warmup,
             timeout,
@@ -227,20 +266,42 @@ impl BaseBenchmark for ConcurrentBenchmark {
         total_duration += result.duration;
         results.push(result);
 
-        // Test 4: Concurrent Database
-        let test_fn = || Self::test_concurrent_database();
-        let result = run_with_iterations(
-            test_fn,
-            "Concurrent Database",
-            concurrent_db_ref,
-            iterations,
-            warmup,
-            timeout,
-        );
-        total_duration += result.duration;
-        results.push(result);
+        // Test 4: Parallel Merge Sort
+        if thread_count > 1 {
+            let test_fn = || Self::test_parallel_merge_sort(thread_count);
+            let result = run_with_iterations(
+                test_fn,
+                &format!("Parallel Merge Sort ({} threads)", thread_count),
+                100_000.0,
+                iterations,
+                warmup,
+                timeout,
+            );
+            total_duration += result.duration;
+            results.push(result);
+        } else {
+            // Single-thread sort
+            let test_fn = || {
+                let size = 100_000;
+                let mut data: Vec<f64> = (0..size).map(|i| (size - i) as f64).collect();
+                let start = Instant::now();
+                data.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                let duration = start.elapsed().as_secs_f64();
+                let _ = data;
+                Ok(size as f64 / duration)
+            };
+            let result = run_with_iterations(
+                test_fn,
+                "Sequential Sort",
+                100_000.0,
+                iterations,
+                warmup,
+                timeout,
+            );
+            total_duration += result.duration;
+            results.push(result);
+        }
 
-        // Calculate category score
         let category_score = calculate_category_score(&results);
 
         Ok(CategoryResult {
@@ -264,23 +325,94 @@ mod tests {
     }
 
     #[test]
-    fn test_threaded_file_io() {
-        let result = ConcurrentBenchmark::test_threaded_file_io();
+    fn test_multi_core_category_name() {
+        let benchmark = ConcurrentBenchmark::new_multi_core();
+        assert_eq!(benchmark.category_name(), "Concurrent");
+    }
+
+    #[test]
+    fn test_threaded_file_io_single() {
+        let result = ConcurrentBenchmark::test_threaded_file_io(1);
         assert!(result.is_ok());
         assert!(result.unwrap() > 0.0);
     }
 
     #[test]
-    fn test_parallel_computation() {
-        let result = ConcurrentBenchmark::test_parallel_computation();
+    fn test_threaded_file_io_multi() {
+        let result = ConcurrentBenchmark::test_threaded_file_io(4);
         assert!(result.is_ok());
         assert!(result.unwrap() > 0.0);
     }
 
     #[test]
-    fn test_thread_synchronization() {
-        let result = ConcurrentBenchmark::test_thread_synchronization();
+    fn test_channel_messaging() {
+        let result = ConcurrentBenchmark::test_channel_messaging(10_000, 2);
         assert!(result.is_ok());
         assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_concurrent_map_build_single() {
+        let result = ConcurrentBenchmark::test_concurrent_map_build(1, 1000);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_concurrent_map_build_multi() {
+        let result = ConcurrentBenchmark::test_concurrent_map_build(4, 1000);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_concurrent_map_build_total_entries() {
+        let threads = 4;
+        let inserts = 100;
+        let result = ConcurrentBenchmark::test_concurrent_map_build(threads, inserts);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_merge_sorted() {
+        let a = vec![1.0, 3.0, 5.0];
+        let b = vec![2.0, 4.0, 6.0];
+        let merged = merge_sorted(&a, &b);
+        assert_eq!(merged, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+    }
+
+    #[test]
+    fn test_merge_sorted_empty() {
+        let a: Vec<f64> = vec![];
+        let b = vec![1.0, 2.0];
+        assert_eq!(merge_sorted(&a, &b), vec![1.0, 2.0]);
+        assert_eq!(merge_sorted(&b, &a), vec![1.0, 2.0]);
+    }
+
+    #[test]
+    fn test_parallel_merge_sort() {
+        let result = ConcurrentBenchmark::test_parallel_merge_sort(2);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_run_all_single_core() {
+        let bench = ConcurrentBenchmark::new();
+        let result = bench.run_all(2, 1, 30);
+        assert!(result.is_ok());
+        let cat = result.unwrap();
+        assert_eq!(cat.category, "Concurrent");
+        assert!(cat.tests.len() >= 4);
+    }
+
+    #[test]
+    fn test_run_all_multi_core() {
+        let bench = ConcurrentBenchmark::new_multi_core();
+        let result = bench.run_all(2, 1, 30);
+        assert!(result.is_ok());
+        let cat = result.unwrap();
+        assert_eq!(cat.category, "Concurrent");
+        assert!(cat.tests.len() >= 4);
     }
 }

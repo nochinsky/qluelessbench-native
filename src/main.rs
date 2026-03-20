@@ -27,9 +27,12 @@ fn run() -> Result<()> {
 
     // Initialize logging if verbose
     if config.verbose {
-        let _ = tracing_subscriber::fmt()
+        if let Err(e) = tracing_subscriber::fmt()
             .with_max_level(tracing::Level::DEBUG)
-            .try_init();
+            .try_init()
+        {
+            eprintln!("Warning: Failed to initialize logging: {}", e);
+        }
     }
 
     // Create runner and execute benchmarks

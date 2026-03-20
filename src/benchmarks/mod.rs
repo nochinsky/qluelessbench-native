@@ -10,11 +10,11 @@
 //! - Archive
 //! - Memory
 //! - Concurrent
-//! - Cryptography (NEW)
-//! - Ray Tracing (NEW)
-//! - ML Inference (NEW)
-//! - Navigation (NEW)
-//! - Image Filters (NEW)
+//! - Cryptography
+//! - Ray Tracing
+//! - ML Inference
+//! - Navigation
+//! - Image Filters
 
 pub mod archive;
 pub mod base;
