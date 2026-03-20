@@ -2,6 +2,7 @@
 name = "qluelessbench-native"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.75"
 authors = ["QlueLess Team"]
 description = "Cross-platform system benchmark tool written in Rust"
 license = "MIT"
@@ -66,9 +67,6 @@ rayon = "1.8"
 aes = "0.8"
 sha2 = "0.10"
 ctr = "0.9"
-
-[dev-dependencies]
-criterion = "0.5"
 
 [[bin]]
 name = "qluelessbench"

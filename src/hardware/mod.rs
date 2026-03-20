@@ -1,6 +1,6 @@
 //! Hardware detection module.
 //!
-//! Provides system information including CPU, GPU, memory, storage, battery, and thermal data.
+//! Provides system information including CPU, GPU, and memory.
 
 use crate::results::SystemInfo;
 use sysinfo::System;
@@ -127,33 +127,6 @@ fn get_macos_gpu() -> Option<String> {
                         .unwrap_or_default()
                 })
         })
-}
-
-/// Get CPU temperature (if available).
-pub fn get_cpu_temperature() -> Option<f32> {
-    // This is platform-specific and requires low-level access
-    // For now, return None
-    None
-}
-
-/// Get GPU temperature (if available).
-pub fn get_gpu_temperature() -> Option<f32> {
-    None
-}
-
-/// Get battery information.
-pub fn get_battery_info() -> Option<BatteryInfo> {
-    // Would use sysinfo or platform-specific APIs
-    None
-}
-
-/// Battery information.
-#[derive(Debug, Clone)]
-pub struct BatteryInfo {
-    pub present: bool,
-    pub plugged_in: bool,
-    pub percent: u8,
-    pub time_remaining: Option<u64>, // seconds
 }
 
 #[cfg(test)]

@@ -280,3 +280,87 @@ impl BaseBenchmark for ImageFiltersBenchmark {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_image_filters_category_name() {
+        let benchmark = ImageFiltersBenchmark::new();
+        assert_eq!(benchmark.category_name(), "Image Filters");
+    }
+
+    #[test]
+    fn test_image_filters_weight() {
+        let benchmark = ImageFiltersBenchmark::new();
+        assert_eq!(benchmark.weight(), 1.3);
+    }
+
+    #[test]
+    fn test_generate_test_image() {
+        let img = ImageFiltersBenchmark::generate_test_image(100, 100);
+        assert_eq!(img.width(), 100);
+        assert_eq!(img.height(), 100);
+    }
+
+    #[test]
+    fn test_apply_blur() {
+        let img = ImageFiltersBenchmark::generate_test_image(64, 64);
+        let blurred = ImageFiltersBenchmark::apply_blur(&img, 2.0);
+        assert_eq!(blurred.width(), img.width());
+        assert_eq!(blurred.height(), img.height());
+    }
+
+    #[test]
+    fn test_apply_edge_detect() {
+        let img = ImageFiltersBenchmark::generate_test_image(64, 64);
+        let edges = ImageFiltersBenchmark::apply_edge_detect(&img);
+        assert_eq!(edges.width(), img.width());
+        assert_eq!(edges.height(), img.height());
+    }
+
+    #[test]
+    fn test_apply_sharpen() {
+        let img = ImageFiltersBenchmark::generate_test_image(64, 64);
+        let sharpened = ImageFiltersBenchmark::apply_sharpen(&img);
+        assert_eq!(sharpened.width(), img.width());
+        assert_eq!(sharpened.height(), img.height());
+    }
+
+    #[test]
+    fn test_multi_core_benchmark_creation() {
+        let single = ImageFiltersBenchmark::new();
+        let multi = ImageFiltersBenchmark::new_multi_core();
+        assert_eq!(single.category_name(), multi.category_name());
+        assert_eq!(single.weight(), multi.weight());
+    }
+
+    #[test]
+    fn test_blur_performance() {
+        let result = ImageFiltersBenchmark::test_blur(256, 256, 2.0);
+        assert!(result.is_ok());
+        assert!(result.unwrap() >= 0.0);
+    }
+
+    #[test]
+    fn test_edge_detect_performance() {
+        let result = ImageFiltersBenchmark::test_edge_detect(256, 256);
+        assert!(result.is_ok());
+        assert!(result.unwrap() >= 0.0);
+    }
+
+    #[test]
+    fn test_sharpen_performance() {
+        let result = ImageFiltersBenchmark::test_sharpen(256, 256);
+        assert!(result.is_ok());
+        assert!(result.unwrap() >= 0.0);
+    }
+
+    #[test]
+    fn test_parallel_filters() {
+        let result = ImageFiltersBenchmark::test_parallel_filters(4, 128, 128);
+        assert!(result.is_ok());
+        assert!(result.unwrap() >= 0.0);
+    }
+}

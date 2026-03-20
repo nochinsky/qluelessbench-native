@@ -242,3 +242,91 @@ impl BaseBenchmark for RayTracingBenchmark {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_raytrace_category_name() {
+        let benchmark = RayTracingBenchmark::new();
+        assert_eq!(benchmark.category_name(), "Ray Tracing");
+    }
+
+    #[test]
+    fn test_raytrace_weight() {
+        let benchmark = RayTracingBenchmark::new();
+        assert_eq!(benchmark.weight(), 1.5);
+    }
+
+    #[test]
+    fn test_vec3_creation() {
+        let v = Vec3::new(1.0, 2.0, 3.0);
+        assert_eq!(v.x, 1.0);
+        assert_eq!(v.y, 2.0);
+        assert_eq!(v.z, 3.0);
+    }
+
+    #[test]
+    fn test_vec3_dot_product() {
+        let v1 = Vec3::new(1.0, 0.0, 0.0);
+        let v2 = Vec3::new(0.0, 1.0, 0.0);
+        assert_eq!(v1.dot(v2), 0.0);
+    }
+
+    #[test]
+    fn test_sphere_intersection() {
+        let sphere = Sphere {
+            center: Vec3::new(0.0, 0.0, -3.0),
+            radius: 1.0,
+        };
+        let origin = Vec3::new(0.0, 0.0, 0.0);
+        let dir = Vec3::new(0.0, 0.0, -1.0);
+        let result = sphere.intersect(origin, dir);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_trace_ray() {
+        let sphere = Sphere {
+            center: Vec3::new(0.0, 0.0, -3.0),
+            radius: 1.0,
+        };
+        let origin = Vec3::new(0.0, 0.0, 0.0);
+        let dir = Vec3::new(0.0, 0.0, -1.0);
+        let color = trace_ray(origin, dir, &[sphere]);
+        assert!(color >= 0.0 && color <= 1.0);
+    }
+
+    #[test]
+    fn test_render_row() {
+        let sphere = Sphere {
+            center: Vec3::new(0.0, 0.0, -3.0),
+            radius: 1.0,
+        };
+        let pixels = render_row(0, 64, 64, &[sphere]);
+        assert_eq!(pixels.len(), 64);
+    }
+
+    #[test]
+    fn test_multi_core_benchmark_creation() {
+        let single = RayTracingBenchmark::new();
+        let multi = RayTracingBenchmark::new_multi_core();
+        assert_eq!(single.category_name(), multi.category_name());
+        assert_eq!(single.weight(), multi.weight());
+    }
+
+    #[test]
+    fn test_ray_trace_sequential() {
+        let result = RayTracingBenchmark::test_ray_trace_sequential(64, 64);
+        assert!(result.is_ok());
+        assert!(result.unwrap() >= 0.0);
+    }
+
+    #[test]
+    fn test_ray_trace() {
+        let result = RayTracingBenchmark::test_ray_trace(64, 64);
+        assert!(result.is_ok());
+        assert!(result.unwrap() >= 0.0);
+    }
+}

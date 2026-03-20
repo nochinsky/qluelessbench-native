@@ -189,3 +189,49 @@ impl BaseBenchmark for MLInferenceBenchmark {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ml_category_name() {
+        let benchmark = MLInferenceBenchmark::new();
+        assert_eq!(benchmark.category_name(), "ML Inference");
+    }
+
+    #[test]
+    fn test_ml_weight() {
+        let benchmark = MLInferenceBenchmark::new();
+        assert_eq!(benchmark.weight(), 1.3);
+    }
+
+    #[test]
+    fn test_nn_forward() {
+        let result = MLInferenceBenchmark::test_nn_forward(784, 128, 10);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_batch_inference() {
+        let result = MLInferenceBenchmark::test_batch_inference(8, 784, 64, 10);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_multi_core_benchmark_creation() {
+        let single = MLInferenceBenchmark::new();
+        let multi = MLInferenceBenchmark::new_multi_core();
+        assert_eq!(single.category_name(), multi.category_name());
+        assert_eq!(single.weight(), multi.weight());
+    }
+
+    #[test]
+    fn test_parallel_batch_inference() {
+        let result = MLInferenceBenchmark::test_parallel_batch_inference(2, 8, 784, 64, 10);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+}

@@ -276,3 +276,57 @@ impl BaseBenchmark for NavigationBenchmark {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_navigation_category_name() {
+        let benchmark = NavigationBenchmark::new();
+        assert_eq!(benchmark.category_name(), "Navigation");
+    }
+
+    #[test]
+    fn test_navigation_weight() {
+        let benchmark = NavigationBenchmark::new();
+        assert_eq!(benchmark.weight(), 1.0);
+    }
+
+    #[test]
+    fn test_generate_road_network() {
+        let (nodes, adjacency) = generate_road_network(100);
+        assert_eq!(nodes.len(), 100);
+        assert_eq!(adjacency.len(), 100);
+    }
+
+    #[test]
+    fn test_dijkstra_returns_distance() {
+        let (nodes, adjacency) = generate_road_network(50);
+        let distance = dijkstra(&adjacency, 0, nodes.len() - 1);
+        assert!(distance < f64::INFINITY);
+        assert!(distance >= 0.0);
+    }
+
+    #[test]
+    fn test_route_finding() {
+        let result = NavigationBenchmark::test_route_finding(100, 10);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_multi_core_benchmark_creation() {
+        let single = NavigationBenchmark::new();
+        let multi = NavigationBenchmark::new_multi_core();
+        assert_eq!(single.category_name(), multi.category_name());
+        assert_eq!(single.weight(), multi.weight());
+    }
+
+    #[test]
+    fn test_parallel_route_finding() {
+        let result = NavigationBenchmark::test_parallel_route_finding(2, 100, 10);
+        assert!(result.is_ok());
+        assert!(result.unwrap() > 0.0);
+    }
+}

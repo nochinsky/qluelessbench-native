@@ -25,7 +25,7 @@ pub fn calculate_median(values: &[f64]) -> f64 {
     let n = sorted.len();
     let mid = n / 2;
 
-    if n.is_multiple_of(2) {
+    if n % 2 == 0 {
         (sorted[mid - 1] + sorted[mid]) / 2.0
     } else {
         sorted[mid]
