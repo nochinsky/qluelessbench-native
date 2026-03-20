@@ -97,14 +97,14 @@ Options:
 
 ```
 ╔════════════════════════════════════════════════╗
-║   QlueLessBench Native v0.1.0                  ║
+║   QlueLessBench Native v0.2.0                  ║
 ╚════════════════════════════════════════════════╝
 
 ═══ Single-Core Tests ═══
-[1/13] Running FileIO tests...
+[1/14] Running FileIO tests...
     ✓ FileIO: 11553 (2.89s)
 
-[2/13] Running Compression tests...
+[2/14] Running Compression tests...
     ✓ Compression: 3854 (3.89s)
 
 ...
@@ -205,12 +205,12 @@ cargo test
 
 ## Current Status
 
-**Version: 0.1.0** (Active Development)
+**Version: 0.2.0** (Active Development)
 
 ### Completed
-- ✅ 13 comprehensive benchmark categories
+- ✅ 14 comprehensive benchmark categories
 - ✅ Single-core and multi-core scoring
-- ✅ Cross-platform support (Windows, Linux)
+- ✅ Cross-platform support (Windows, Linux, macOS)
 - ✅ Clean CLI interface
 - ✅ Statistical analysis (median, percentiles, CV)
 - ✅ Automatic test file cleanup
@@ -241,7 +241,7 @@ MIT License - See [LICENSE](LICENSE) file for details.
 
 ## Version
 
-**QlueLessBench Native v0.1.0**
+**QlueLessBench Native v0.2.0**
 
 ---
 

@@ -133,7 +133,11 @@ impl BenchmarkRunner {
         let comparison = self.load_comparison();
 
         // Print final results
-        self.print_final_results(&results, comparison.as_ref());
+        if self.config.summary {
+            self.print_summary(&results, comparison.as_ref());
+        } else {
+            self.print_final_results(&results, comparison.as_ref());
+        }
 
         // Save results
         self.save_results(&results);
@@ -371,6 +375,113 @@ impl BenchmarkRunner {
             sign,
             pct,
         );
+    }
+
+    /// Print compact summary table.
+    fn print_summary(&self, results: &BenchmarkResults, comparison: Option<&BenchmarkResults>) {
+        println!();
+        println!(
+            "{}",
+            style(format!(
+                "  QlueLessBench v{} | {} | {} cores",
+                results.metadata.version,
+                results.system_info.platform_release,
+                results.system_info.cpu_count_logical,
+            ))
+            .dim()
+        );
+        println!();
+        println!(
+            "  {:<22} {:>10}  {:<22} {:>10}",
+            style("Category").bold(),
+            style("Score").bold(),
+            style("Category").bold(),
+            style("Score").bold(),
+        );
+        println!("  {}", "─".repeat(60));
+
+        // Print categories in two columns: single-core left, multi-core right
+        let max_len = results
+            .single_core_categories
+            .len()
+            .max(results.multi_core_categories.len());
+
+        for i in 0..max_len {
+            let left = results.single_core_categories.get(i);
+            let right = results.multi_core_categories.get(i);
+
+            let left_str = left
+                .map(|c| format!("{:<22} {:>10.0}", c.category, c.score))
+                .unwrap_or_default();
+            let right_str = right
+                .map(|c| format!("{:<22} {:>10.0}", c.category, c.score))
+                .unwrap_or_default();
+
+            println!("  {}  {}", left_str, right_str);
+        }
+
+        println!("  {}", "─".repeat(60));
+
+        if let Some(prev) = comparison {
+            let sc_delta = results.single_core_score - prev.single_core_score;
+            let mc_delta = results.multi_core_score - prev.multi_core_score;
+            let sc_pct = if prev.single_core_score != 0.0 {
+                (sc_delta / prev.single_core_score) * 100.0
+            } else {
+                0.0
+            };
+            let mc_pct = if prev.multi_core_score != 0.0 {
+                (mc_delta / prev.multi_core_score) * 100.0
+            } else {
+                0.0
+            };
+            let sc_arrow = if sc_delta > 0.0 {
+                "↑"
+            } else if sc_delta < 0.0 {
+                "↓"
+            } else {
+                "→"
+            };
+            let mc_arrow = if mc_delta > 0.0 {
+                "↑"
+            } else if mc_delta < 0.0 {
+                "↓"
+            } else {
+                "→"
+            };
+
+            println!(
+                "  {:<22} {:>10.0}  {:<22} {:>10.0}",
+                style("Single-Core").bold(),
+                style(format!("{:.0}", results.single_core_score))
+                    .bright()
+                    .green(),
+                style("Multi-Core").bold(),
+                style(format!("{:.0}", results.multi_core_score))
+                    .bright()
+                    .green(),
+            );
+            println!(
+                "  {:<22} {:>10}  {:<22} {:>10}",
+                "",
+                format!("{} {:+.1}%", sc_arrow, sc_pct),
+                "",
+                format!("{} {:+.1}%", mc_arrow, mc_pct),
+            );
+        } else {
+            println!(
+                "  {:<22} {:>10}  {:<22} {:>10}",
+                style("Single-Core").bold(),
+                style(format!("{:.0}", results.single_core_score))
+                    .bright()
+                    .green(),
+                style("Multi-Core").bold(),
+                style(format!("{:.0}", results.multi_core_score))
+                    .bright()
+                    .green(),
+            );
+        }
+        println!();
     }
 }
 

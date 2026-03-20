@@ -2,6 +2,26 @@ use std::fs;
 use std::process::Command;
 use tempfile::TempDir;
 
+/// Helper: run benchmark with minimal config and return output JSON.
+fn run_benchmark_and_get_json(output_file: &std::path::Path) -> serde_json::Value {
+    let _ = Command::new(env!("CARGO_BIN_EXE_qluelessbench"))
+        .args([
+            "--iterations",
+            "1",
+            "--warmup",
+            "0",
+            "--timeout",
+            "10",
+            "--output",
+        ])
+        .arg(output_file)
+        .output()
+        .expect("Failed to execute benchmark");
+
+    let content = fs::read_to_string(output_file).expect("Failed to read results file");
+    serde_json::from_str(&content).expect("Invalid JSON")
+}
+
 #[test]
 fn test_cli_help_flag() {
     let output = Command::new(env!("CARGO_BIN_EXE_qluelessbench"))
@@ -288,4 +308,144 @@ fn test_results_persistence() {
     let content2 = fs::read_to_string(&output_file).expect("Second read should succeed");
 
     assert_eq!(content1, content2, "File content should be consistent");
+}
+
+#[test]
+fn test_all_benchmark_categories_ran() {
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let output_file = temp_dir.path().join("categories.json");
+    let json = run_benchmark_and_get_json(&output_file);
+
+    let single = json
+        .get("single_core_categories")
+        .and_then(|v| v.as_array())
+        .expect("Missing single_core_categories array");
+    let multi = json
+        .get("multi_core_categories")
+        .and_then(|v| v.as_array())
+        .expect("Missing multi_core_categories array");
+
+    // 14 benchmark categories
+    assert_eq!(single.len(), 14, "Expected 14 single-core categories");
+    assert_eq!(multi.len(), 14, "Expected 14 multi-core categories");
+
+    // Verify expected category names
+    let expected = [
+        "FileIO",
+        "Compression",
+        "ImageProcessing",
+        "TextProcessing",
+        "Database",
+        "Mathematical",
+        "Archive",
+        "Memory",
+        "Concurrent",
+        "Cryptography",
+        "RayTracing",
+        "MLInference",
+        "Navigation",
+        "ImageFilters",
+    ];
+    for name in &expected {
+        let found = single
+            .iter()
+            .any(|c| c.get("category").and_then(|v| v.as_str()) == Some(name));
+        assert!(found, "Missing single-core category: {}", name);
+    }
+}
+
+#[test]
+fn test_scores_are_nonzero() {
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let output_file = temp_dir.path().join("scores.json");
+    let json = run_benchmark_and_get_json(&output_file);
+
+    let single_score = json
+        .get("single_core_score")
+        .and_then(|v| v.as_f64())
+        .expect("Missing single_core_score");
+    let multi_score = json
+        .get("multi_core_score")
+        .and_then(|v| v.as_f64())
+        .expect("Missing multi_core_score");
+    let overall = json
+        .get("overall_score")
+        .and_then(|v| v.as_f64())
+        .expect("Missing overall_score");
+
+    assert!(single_score > 0.0, "Single-core score should be > 0");
+    assert!(multi_score > 0.0, "Multi-core score should be > 0");
+    assert!(overall > 0.0, "Overall score should be > 0");
+}
+
+#[test]
+fn test_system_info_complete() {
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let output_file = temp_dir.path().join("sysinfo.json");
+    let json = run_benchmark_and_get_json(&output_file);
+
+    let sys = json.get("system_info").expect("Missing system_info");
+    assert!(
+        sys.get("platform")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .len()
+            > 0
+    );
+    assert!(
+        sys.get("cpu_count_logical")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0)
+            > 0
+    );
+    assert!(
+        sys.get("memory_total_gb")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0)
+            > 0.0
+    );
+}
+
+#[test]
+fn test_category_tests_nonempty() {
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let output_file = temp_dir.path().join("cat_tests.json");
+    let json = run_benchmark_and_get_json(&output_file);
+
+    let single = json
+        .get("single_core_categories")
+        .and_then(|v| v.as_array())
+        .expect("Missing single_core_categories");
+
+    // At least most categories should have tests
+    let categories_with_tests: usize = single
+        .iter()
+        .filter(|c| {
+            c.get("tests")
+                .and_then(|t| t.as_array())
+                .map(|a| !a.is_empty())
+                .unwrap_or(false)
+        })
+        .count();
+
+    assert!(
+        categories_with_tests >= 12,
+        "Expected at least 12 categories with tests, got {}",
+        categories_with_tests
+    );
+}
+
+#[test]
+fn test_metadata_version_matches() {
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let output_file = temp_dir.path().join("version.json");
+    let json = run_benchmark_and_get_json(&output_file);
+
+    let version = json
+        .get("metadata")
+        .and_then(|m| m.get("version"))
+        .and_then(|v| v.as_str())
+        .expect("Missing metadata.version");
+
+    assert_eq!(version, env!("CARGO_PKG_VERSION"));
 }

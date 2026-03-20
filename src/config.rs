@@ -38,6 +38,10 @@ pub struct Cli {
     /// Compare results against a previous run (path to JSON file)
     #[arg(long)]
     pub compare: Option<PathBuf>,
+
+    /// Print compact summary table instead of verbose output
+    #[arg(short, long, default_value_t = false)]
+    pub summary: bool,
 }
 
 /// Benchmark configuration.
@@ -55,6 +59,8 @@ pub struct BenchmarkConfig {
     pub output_path: Option<PathBuf>,
     /// Path to previous results for comparison
     pub compare_path: Option<PathBuf>,
+    /// Print compact summary table
+    pub summary: bool,
 }
 
 impl Default for BenchmarkConfig {
@@ -66,6 +72,7 @@ impl Default for BenchmarkConfig {
             verbose: false,
             output_path: None,
             compare_path: None,
+            summary: false,
         }
     }
 }
@@ -80,6 +87,7 @@ impl BenchmarkConfig {
             verbose: cli.verbose,
             output_path: cli.output,
             compare_path: cli.compare,
+            summary: cli.summary,
         }
     }
 }
@@ -113,6 +121,7 @@ mod tests {
             timeout: 30,
             output: None,
             compare: None,
+            summary: false,
         };
         let config = BenchmarkConfig::from_cli(cli);
         assert_eq!(config.iterations, 5);
