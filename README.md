@@ -34,7 +34,7 @@ A comprehensive cross-platform system benchmark tool written in Rust, inspired b
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/qluelessbench-native.git
+git clone https://github.com/nochinsky/qluelessbench-native.git
 cd qluelessbench-native
 
 # Build in release mode

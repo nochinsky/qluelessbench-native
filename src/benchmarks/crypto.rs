@@ -4,6 +4,7 @@
 
 use aes::Aes256;
 use anyhow::Result;
+use rand::Rng;
 use rayon::prelude::*;
 use sha2::{Digest, Sha256};
 use std::time::Instant;
@@ -34,13 +35,13 @@ impl CryptoBenchmark {
         use aes::cipher::{KeyIvInit, StreamCipher};
         type Aes256Ctr = ctr::Ctr128BE<Aes256>;
 
-        let key = [0u8; 32];
-        let iv = [0u8; 16];
+        let mut rng = rand::thread_rng();
+        let key: [u8; 32] = rng.gen();
+        let iv: [u8; 16] = rng.gen();
         let mut cipher = Aes256Ctr::new_from_slices(&key, &iv)
             .map_err(|e| anyhow::anyhow!("AES init failed: {}", e))?;
 
         let mut data = vec![0u8; data_size_mb * 1024 * 1024];
-        // Fill with some pattern
         for (i, byte) in data.iter_mut().enumerate() {
             *byte = (i % 256) as u8;
         }
