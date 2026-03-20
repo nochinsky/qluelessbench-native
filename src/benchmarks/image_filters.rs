@@ -10,6 +10,7 @@ use std::time::Instant;
 use crate::benchmarks::base::{
     calculate_category_score, get_parallel_workers, run_with_iterations, BaseBenchmark,
 };
+use crate::references::ReferenceValues;
 use crate::results::CategoryResult;
 
 /// Image filters benchmark.
@@ -213,12 +214,7 @@ impl BaseBenchmark for ImageFiltersBenchmark {
     fn run_all(&self, iterations: usize, warmup: usize, timeout: u64) -> Result<CategoryResult> {
         let mut results = Vec::new();
         let mut total_duration = 0.0;
-
-        // Reference values (megapixels/second)
-        let blur_ref = 10.0;
-        let edge_ref = 20.0;
-        let sharpen_ref = 15.0;
-        let parallel_ref = 50.0;
+        let refs = ReferenceValues::load();
 
         if self.multi_core {
             let num_workers = get_parallel_workers();
@@ -228,7 +224,7 @@ impl BaseBenchmark for ImageFiltersBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Image Filters (parallel)",
-                parallel_ref,
+                refs.image_filters.parallel_megapixels_per_sec,
                 iterations,
                 warmup,
                 timeout,
@@ -241,7 +237,7 @@ impl BaseBenchmark for ImageFiltersBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Gaussian Blur",
-                blur_ref,
+                refs.image_filters.blur_megapixels_per_sec,
                 iterations,
                 warmup,
                 timeout,
@@ -253,7 +249,7 @@ impl BaseBenchmark for ImageFiltersBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Edge Detection",
-                edge_ref,
+                refs.image_filters.edge_megapixels_per_sec,
                 iterations,
                 warmup,
                 timeout,
@@ -262,8 +258,14 @@ impl BaseBenchmark for ImageFiltersBenchmark {
             results.push(result);
 
             let test_fn = || Self::test_sharpen(1024, 1024);
-            let result =
-                run_with_iterations(test_fn, "Sharpen", sharpen_ref, iterations, warmup, timeout);
+            let result = run_with_iterations(
+                test_fn,
+                "Sharpen",
+                refs.image_filters.sharpen_megapixels_per_sec,
+                iterations,
+                warmup,
+                timeout,
+            );
             total_duration += result.duration;
             results.push(result);
         }

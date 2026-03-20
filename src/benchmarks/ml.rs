@@ -10,6 +10,7 @@ use std::time::Instant;
 use crate::benchmarks::base::{
     calculate_category_score, get_parallel_workers, run_with_iterations, BaseBenchmark,
 };
+use crate::references::ReferenceValues;
 use crate::results::CategoryResult;
 
 /// ML inference benchmark.
@@ -128,11 +129,7 @@ impl BaseBenchmark for MLInferenceBenchmark {
     fn run_all(&self, iterations: usize, warmup: usize, timeout: u64) -> Result<CategoryResult> {
         let mut results = Vec::new();
         let mut total_duration = 0.0;
-
-        // Reference values (inferences per second)
-        let single_ref = 5000.0;
-        let batch_ref = 500.0;
-        let parallel_ref = 5000.0;
+        let refs = ReferenceValues::load();
 
         if self.multi_core {
             let num_workers = get_parallel_workers();
@@ -142,7 +139,7 @@ impl BaseBenchmark for MLInferenceBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "ML Inference (parallel batches)",
-                parallel_ref,
+                refs.ml_inference.parallel_ops,
                 iterations,
                 warmup,
                 timeout,
@@ -155,7 +152,7 @@ impl BaseBenchmark for MLInferenceBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "NN Forward Pass",
-                single_ref,
+                refs.ml_inference.single_ops,
                 iterations,
                 warmup,
                 timeout,
@@ -168,7 +165,7 @@ impl BaseBenchmark for MLInferenceBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Batch Inference (32)",
-                batch_ref,
+                refs.ml_inference.batch_ops,
                 iterations,
                 warmup,
                 timeout,

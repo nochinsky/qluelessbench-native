@@ -26,6 +26,11 @@ pub struct ReferenceValues {
     pub archive: ArchiveReferences,
     pub memory: MemoryReferences,
     pub cryptography: CryptographyReferences,
+    pub ml_inference: MLInferenceReferences,
+    pub concurrent: ConcurrentReferences,
+    pub ray_tracing: RayTracingReferences,
+    pub navigation: NavigationReferences,
+    pub image_filters: ImageFiltersReferences,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,12 +95,48 @@ pub struct MemoryReferences {
     pub alloc_dealloc_mbps: f64,
     pub vec_ops_mbps: f64,
     pub hashmap_ops_mbps: f64,
+    pub large_structure_mbps: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CryptographyReferences {
     pub aes_encrypt_mbps: f64,
     pub sha256_mbps: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MLInferenceReferences {
+    pub single_ops: f64,
+    pub batch_ops: f64,
+    pub parallel_ops: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConcurrentReferences {
+    pub threaded_file_io_mbps: f64,
+    pub channel_messaging_ops: f64,
+    pub concurrent_map_build_ops: f64,
+    pub parallel_sort_mbps: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RayTracingReferences {
+    pub single_core_megapixels_per_sec: f64,
+    pub multi_core_megapixels_per_sec: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NavigationReferences {
+    pub single_routes_per_sec: f64,
+    pub parallel_routes_per_sec: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageFiltersReferences {
+    pub blur_megapixels_per_sec: f64,
+    pub edge_megapixels_per_sec: f64,
+    pub sharpen_megapixels_per_sec: f64,
+    pub parallel_megapixels_per_sec: f64,
 }
 
 impl Default for ReferenceValues {
@@ -148,10 +189,36 @@ impl Default for ReferenceValues {
                 alloc_dealloc_mbps: 5000.0,
                 vec_ops_mbps: 3000.0,
                 hashmap_ops_mbps: 2000.0,
+                large_structure_mbps: 300.0,
             },
             cryptography: CryptographyReferences {
                 aes_encrypt_mbps: 500.0,
-                sha256_mbps: 300.0,
+                sha256_mbps: 800.0,
+            },
+            ml_inference: MLInferenceReferences {
+                single_ops: 5000.0,
+                batch_ops: 500.0,
+                parallel_ops: 5000.0,
+            },
+            concurrent: ConcurrentReferences {
+                threaded_file_io_mbps: 200.0,
+                channel_messaging_ops: 5_000_000.0,
+                concurrent_map_build_ops: 500_000.0,
+                parallel_sort_mbps: 100_000.0,
+            },
+            ray_tracing: RayTracingReferences {
+                single_core_megapixels_per_sec: 2.0,
+                multi_core_megapixels_per_sec: 20.0,
+            },
+            navigation: NavigationReferences {
+                single_routes_per_sec: 100.0,
+                parallel_routes_per_sec: 500.0,
+            },
+            image_filters: ImageFiltersReferences {
+                blur_megapixels_per_sec: 10.0,
+                edge_megapixels_per_sec: 20.0,
+                sharpen_megapixels_per_sec: 15.0,
+                parallel_megapixels_per_sec: 50.0,
             },
         }
     }

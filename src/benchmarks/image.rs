@@ -11,6 +11,7 @@ use std::time::Instant;
 use crate::benchmarks::base::{
     calculate_category_score, get_parallel_workers, run_with_iterations, BaseBenchmark,
 };
+use crate::references::ReferenceValues;
 use crate::results::CategoryResult;
 
 /// Image processing benchmark.
@@ -152,13 +153,10 @@ impl BaseBenchmark for ImageProcessingBenchmark {
     fn run_all(&self, iterations: usize, warmup: usize, timeout: u64) -> Result<CategoryResult> {
         let mut results = Vec::new();
         let mut total_duration = 0.0;
+        let refs = ReferenceValues::load();
 
         // Generate test image once (2048x2048)
         let test_image = Self::generate_test_image(2048, 2048);
-
-        // Reference values (operations per second - calibrated)
-        // Same reference values used for both single-core and multi-core modes
-        let (resize_ref, blur_ref, sharpen_ref, format_ref) = (20.0, 10.0, 50.0, 50.0);
 
         if self.multi_core {
             // Multi-core: process multiple full-size images in parallel (throughput model)
@@ -170,7 +168,7 @@ impl BaseBenchmark for ImageProcessingBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Resize ({} images)", num_workers),
-                resize_ref,
+                refs.image_processing.resize_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -182,7 +180,7 @@ impl BaseBenchmark for ImageProcessingBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Blur ({} images)", num_workers),
-                blur_ref,
+                refs.image_processing.blur_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -194,7 +192,7 @@ impl BaseBenchmark for ImageProcessingBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Sharpen ({} images)", num_workers),
-                sharpen_ref,
+                refs.image_processing.sharpen_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -206,7 +204,7 @@ impl BaseBenchmark for ImageProcessingBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Format Conversion ({} images)", num_workers),
-                format_ref,
+                refs.image_processing.format_convert_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -220,7 +218,7 @@ impl BaseBenchmark for ImageProcessingBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Resize Operations",
-                resize_ref,
+                refs.image_processing.resize_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -233,7 +231,7 @@ impl BaseBenchmark for ImageProcessingBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Blur Filter",
-                blur_ref,
+                refs.image_processing.blur_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -246,7 +244,7 @@ impl BaseBenchmark for ImageProcessingBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Sharpen Filter",
-                sharpen_ref,
+                refs.image_processing.sharpen_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -259,7 +257,7 @@ impl BaseBenchmark for ImageProcessingBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Format Conversion",
-                format_ref,
+                refs.image_processing.format_convert_mbps,
                 iterations,
                 warmup,
                 timeout,

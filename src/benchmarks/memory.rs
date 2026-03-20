@@ -10,6 +10,7 @@ use std::time::Instant;
 use crate::benchmarks::base::{
     calculate_category_score, get_parallel_workers, run_with_iterations, BaseBenchmark,
 };
+use crate::references::ReferenceValues;
 use crate::results::CategoryResult;
 
 /// Memory benchmark.
@@ -308,10 +309,7 @@ impl BaseBenchmark for MemoryBenchmark {
     fn run_all(&self, iterations: usize, warmup: usize, timeout: u64) -> Result<CategoryResult> {
         let mut results = Vec::new();
         let mut total_duration = 0.0;
-
-        // Reference values (operations per second - calibrated)
-        // Same reference values used for both single-core and multi-core modes
-        let (alloc_ref, vec_ref, hashmap_ref, structure_ref) = (3000.0, 3000.0, 3000.0, 300.0);
+        let refs = ReferenceValues::load();
 
         if self.multi_core {
             // Multi-core: parallel memory operations with SAME total work as single-core
@@ -321,7 +319,7 @@ impl BaseBenchmark for MemoryBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Alloc/Dealloc Cycles ({} workers)", num_workers),
-                alloc_ref,
+                refs.memory.alloc_dealloc_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -333,7 +331,7 @@ impl BaseBenchmark for MemoryBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Vec Operations ({} workers)", num_workers),
-                vec_ref,
+                refs.memory.vec_ops_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -345,7 +343,7 @@ impl BaseBenchmark for MemoryBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel HashMap Operations ({} workers)", num_workers),
-                hashmap_ref,
+                refs.memory.hashmap_ops_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -357,7 +355,7 @@ impl BaseBenchmark for MemoryBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Large Structure ({} workers)", num_workers),
-                structure_ref,
+                refs.memory.large_structure_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -371,7 +369,7 @@ impl BaseBenchmark for MemoryBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Alloc/Dealloc Cycles",
-                alloc_ref,
+                refs.memory.alloc_dealloc_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -384,7 +382,7 @@ impl BaseBenchmark for MemoryBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Vec Operations",
-                vec_ref,
+                refs.memory.vec_ops_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -397,7 +395,7 @@ impl BaseBenchmark for MemoryBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "HashMap Operations",
-                hashmap_ref,
+                refs.memory.hashmap_ops_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -410,7 +408,7 @@ impl BaseBenchmark for MemoryBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Large Structure",
-                structure_ref,
+                refs.memory.large_structure_mbps,
                 iterations,
                 warmup,
                 timeout,

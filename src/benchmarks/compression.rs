@@ -11,6 +11,7 @@ use std::time::Instant;
 use crate::benchmarks::base::{
     calculate_category_score, get_parallel_workers, run_with_iterations, BaseBenchmark,
 };
+use crate::references::ReferenceValues;
 use crate::results::CategoryResult;
 
 /// Compression benchmark.
@@ -199,13 +200,10 @@ impl BaseBenchmark for CompressionBenchmark {
     fn run_all(&self, iterations: usize, warmup: usize, timeout: u64) -> Result<CategoryResult> {
         let mut results = Vec::new();
         let mut total_duration = 0.0;
+        let refs = ReferenceValues::load();
 
         // Generate test data once
         let test_data = Self::generate_test_data(10);
-
-        // Reference values (MB/s - calibrated for typical systems)
-        // Same reference values used for both single-core and multi-core modes
-        let (zip1_ref, zip6_ref, zip9_ref, gzip_ref) = (200.0, 80.0, 40.0, 60.0);
 
         if self.multi_core {
             // Multi-core: compress same total data in parallel, split across workers
@@ -215,7 +213,7 @@ impl BaseBenchmark for CompressionBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel ZIP Fast (10MB / {} workers)", num_workers),
-                zip1_ref,
+                refs.compression.zip_level_1_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -228,7 +226,7 @@ impl BaseBenchmark for CompressionBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel ZIP Balanced (10MB / {} workers)", num_workers),
-                zip6_ref,
+                refs.compression.zip_level_6_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -241,7 +239,7 @@ impl BaseBenchmark for CompressionBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel GZIP (10MB / {} workers)", num_workers),
-                gzip_ref,
+                refs.compression.gzip_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -254,7 +252,7 @@ impl BaseBenchmark for CompressionBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel ZIP Max (10MB / {} workers)", num_workers),
-                zip9_ref,
+                refs.compression.zip_level_9_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -268,7 +266,7 @@ impl BaseBenchmark for CompressionBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "ZIP Fast (Level 1)",
-                zip1_ref,
+                refs.compression.zip_level_1_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -281,7 +279,7 @@ impl BaseBenchmark for CompressionBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "ZIP Balanced (Level 6)",
-                zip6_ref,
+                refs.compression.zip_level_6_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -294,7 +292,7 @@ impl BaseBenchmark for CompressionBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "ZIP Max (Level 9)",
-                zip9_ref,
+                refs.compression.zip_level_9_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -304,8 +302,14 @@ impl BaseBenchmark for CompressionBenchmark {
 
             let data_clone = test_data.clone();
             let test_fn = move || Self::test_gzip(&data_clone);
-            let result =
-                run_with_iterations(test_fn, "GZIP", gzip_ref, iterations, warmup, timeout);
+            let result = run_with_iterations(
+                test_fn,
+                "GZIP",
+                refs.compression.gzip_mbps,
+                iterations,
+                warmup,
+                timeout,
+            );
             total_duration += result.duration;
             results.push(result);
         }

@@ -11,6 +11,7 @@ use crate::benchmarks::base::{
     calculate_category_score, get_parallel_workers, run_with_iterations, BaseBenchmark,
     WorkloadScale,
 };
+use crate::references::ReferenceValues;
 use crate::results::CategoryResult;
 
 /// Mathematical benchmark.
@@ -242,11 +243,8 @@ impl BaseBenchmark for MathematicalBenchmark {
     fn run_all(&self, iterations: usize, warmup: usize, timeout: u64) -> Result<CategoryResult> {
         let mut results = Vec::new();
         let mut total_duration = 0.0;
-
-        // Reference values (operations per second)
-        // Same reference values used for both single-core and multi-core modes
-        let (array_ref, matrix_ref, stats_ref, prime_ref) = (50000.0, 50.0, 5000.0, 500.0);
         let scale = WorkloadScale::detect();
+        let refs = ReferenceValues::load();
 
         // Base sizes scaled by system capabilities
         let array_size = scale.scale_capped(1000, 8000);
@@ -261,7 +259,7 @@ impl BaseBenchmark for MathematicalBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel NumPy Array Ops ({} workers)", num_workers),
-                array_ref,
+                refs.mathematical.array_ops_gflops,
                 iterations,
                 warmup,
                 timeout,
@@ -273,7 +271,7 @@ impl BaseBenchmark for MathematicalBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Matrix Multiplication ({} workers)", num_workers),
-                matrix_ref,
+                refs.mathematical.matrix_mult_gflops,
                 iterations,
                 warmup,
                 timeout,
@@ -285,7 +283,7 @@ impl BaseBenchmark for MathematicalBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Statistics ({} workers)", num_workers),
-                stats_ref,
+                refs.mathematical.statistics_gflops,
                 iterations,
                 warmup,
                 timeout,
@@ -297,7 +295,7 @@ impl BaseBenchmark for MathematicalBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Prime Generation ({} workers)", num_workers),
-                prime_ref,
+                refs.mathematical.primes_mops,
                 iterations,
                 warmup,
                 timeout,
@@ -310,7 +308,7 @@ impl BaseBenchmark for MathematicalBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "NumPy Array Ops",
-                array_ref,
+                refs.mathematical.array_ops_gflops,
                 iterations,
                 warmup,
                 timeout,
@@ -322,7 +320,7 @@ impl BaseBenchmark for MathematicalBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Matrix Multiplication",
-                matrix_ref,
+                refs.mathematical.matrix_mult_gflops,
                 iterations,
                 warmup,
                 timeout,
@@ -334,7 +332,7 @@ impl BaseBenchmark for MathematicalBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Statistics",
-                stats_ref,
+                refs.mathematical.statistics_gflops,
                 iterations,
                 warmup,
                 timeout,
@@ -346,7 +344,7 @@ impl BaseBenchmark for MathematicalBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Prime Generation",
-                prime_ref,
+                refs.mathematical.primes_mops,
                 iterations,
                 warmup,
                 timeout,

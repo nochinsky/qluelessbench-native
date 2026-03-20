@@ -13,6 +13,7 @@ use crate::benchmarks::base::{
     calculate_category_score, get_parallel_workers, run_with_iterations, BaseBenchmark,
     WorkloadScale,
 };
+use crate::references::ReferenceValues;
 use crate::results::CategoryResult;
 
 /// Cryptography benchmark.
@@ -115,10 +116,7 @@ impl BaseBenchmark for CryptoBenchmark {
         let mut results = Vec::new();
         let mut total_duration = 0.0;
         let scale = WorkloadScale::detect();
-
-        // Reference values (MB/s - calibrated for typical modern CPU)
-        let aes_ref = 500.0;
-        let sha256_ref = 800.0;
+        let refs = ReferenceValues::load();
 
         if self.multi_core {
             let num_workers = get_parallel_workers();
@@ -129,7 +127,7 @@ impl BaseBenchmark for CryptoBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "AES-256 Encrypt (parallel)",
-                aes_ref,
+                refs.cryptography.aes_encrypt_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -142,7 +140,7 @@ impl BaseBenchmark for CryptoBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "SHA256 Hash (parallel)",
-                sha256_ref,
+                refs.cryptography.sha256_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -157,7 +155,7 @@ impl BaseBenchmark for CryptoBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "AES-256 Encrypt",
-                aes_ref,
+                refs.cryptography.aes_encrypt_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -170,7 +168,7 @@ impl BaseBenchmark for CryptoBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "SHA256 Hash",
-                sha256_ref,
+                refs.cryptography.sha256_mbps,
                 iterations,
                 warmup,
                 timeout,

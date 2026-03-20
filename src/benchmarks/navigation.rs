@@ -11,6 +11,7 @@ use std::time::Instant;
 use crate::benchmarks::base::{
     calculate_category_score, get_parallel_workers, run_with_iterations, BaseBenchmark,
 };
+use crate::references::ReferenceValues;
 use crate::results::CategoryResult;
 
 /// Graph node for pathfinding.
@@ -229,10 +230,7 @@ impl BaseBenchmark for NavigationBenchmark {
     fn run_all(&self, iterations: usize, warmup: usize, timeout: u64) -> Result<CategoryResult> {
         let mut results = Vec::new();
         let mut total_duration = 0.0;
-
-        // Reference values (routes per second)
-        let single_ref = 100.0;
-        let parallel_ref = 500.0;
+        let refs = ReferenceValues::load();
 
         if self.multi_core {
             let num_workers = get_parallel_workers();
@@ -242,7 +240,7 @@ impl BaseBenchmark for NavigationBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Route Finding (parallel)",
-                parallel_ref,
+                refs.navigation.parallel_routes_per_sec,
                 iterations,
                 warmup,
                 timeout,
@@ -255,7 +253,7 @@ impl BaseBenchmark for NavigationBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Route Finding",
-                single_ref,
+                refs.navigation.single_routes_per_sec,
                 iterations,
                 warmup,
                 timeout,

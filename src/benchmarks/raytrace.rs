@@ -7,6 +7,7 @@ use rayon::prelude::*;
 use std::time::Instant;
 
 use crate::benchmarks::base::{calculate_category_score, run_with_iterations, BaseBenchmark};
+use crate::references::ReferenceValues;
 use crate::results::CategoryResult;
 
 /// Simple vector type.
@@ -197,10 +198,7 @@ impl BaseBenchmark for RayTracingBenchmark {
     fn run_all(&self, iterations: usize, warmup: usize, timeout: u64) -> Result<CategoryResult> {
         let mut results = Vec::new();
         let mut total_duration = 0.0;
-
-        // Reference values (megapixels/second)
-        let single_core_ref = 2.0; // 2 MP/s for single-core
-        let multi_core_ref = 20.0; // 20 MP/s for multi-core (10x)
+        let refs = ReferenceValues::load();
 
         if self.multi_core {
             // Multi-core: Higher resolution with parallel rendering
@@ -208,7 +206,7 @@ impl BaseBenchmark for RayTracingBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Ray Tracing (1024x1024)",
-                multi_core_ref,
+                refs.ray_tracing.multi_core_megapixels_per_sec,
                 iterations,
                 warmup,
                 timeout,
@@ -221,7 +219,7 @@ impl BaseBenchmark for RayTracingBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Ray Tracing (512x512)",
-                single_core_ref,
+                refs.ray_tracing.single_core_megapixels_per_sec,
                 iterations,
                 warmup,
                 timeout,

@@ -13,6 +13,7 @@ use tempfile::TempDir;
 use crate::benchmarks::base::{
     calculate_category_score, get_parallel_workers, run_with_iterations, BaseBenchmark,
 };
+use crate::references::ReferenceValues;
 use crate::results::CategoryResult;
 
 /// File I/O benchmark.
@@ -335,11 +336,7 @@ impl BaseBenchmark for FileIOBenchmark {
     fn run_all(&self, iterations: usize, warmup: usize, timeout: u64) -> Result<CategoryResult> {
         let mut results = Vec::new();
         let mut total_duration = 0.0;
-
-        // Reference values (calibrated for typical SSD performance)
-        // Same reference values used for both single-core and multi-core modes
-        let (write_ref, read_ref, random_ref, copy_ref, delete_ref) =
-            (200.0, 300.0, 50000.0, 250.0, 500.0);
+        let refs = ReferenceValues::load();
 
         if self.multi_core {
             // Multi-core tests: parallel file operations with throughput model
@@ -351,7 +348,7 @@ impl BaseBenchmark for FileIOBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Write (100MB x {} workers)", num_workers),
-                write_ref,
+                refs.fileio.sequential_write_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -364,7 +361,7 @@ impl BaseBenchmark for FileIOBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Read (100MB x {} workers)", num_workers),
-                read_ref,
+                refs.fileio.sequential_read_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -377,7 +374,7 @@ impl BaseBenchmark for FileIOBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Random Access ({} workers)", num_workers),
-                random_ref,
+                refs.fileio.random_access_ops,
                 iterations,
                 warmup,
                 timeout,
@@ -390,7 +387,7 @@ impl BaseBenchmark for FileIOBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Copy (50MB x {} workers)", num_workers),
-                copy_ref,
+                refs.fileio.copy_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -403,7 +400,7 @@ impl BaseBenchmark for FileIOBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Delete (100 files x {} workers)", num_workers),
-                delete_ref,
+                refs.fileio.delete_files_per_sec,
                 iterations,
                 warmup,
                 timeout,
@@ -417,7 +414,7 @@ impl BaseBenchmark for FileIOBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Sequential Write (100MB)",
-                write_ref,
+                refs.fileio.sequential_write_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -430,7 +427,7 @@ impl BaseBenchmark for FileIOBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Sequential Read (100MB)",
-                read_ref,
+                refs.fileio.sequential_read_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -443,7 +440,7 @@ impl BaseBenchmark for FileIOBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Random Access",
-                random_ref,
+                refs.fileio.random_access_ops,
                 iterations,
                 warmup,
                 timeout,
@@ -453,8 +450,14 @@ impl BaseBenchmark for FileIOBenchmark {
 
             // Test 4: Copy Files (50MB)
             let test_fn = || Self::test_copy(50);
-            let result =
-                run_with_iterations(test_fn, "Copy Files", copy_ref, iterations, warmup, timeout);
+            let result = run_with_iterations(
+                test_fn,
+                "Copy Files",
+                refs.fileio.copy_mbps,
+                iterations,
+                warmup,
+                timeout,
+            );
             total_duration += result.duration;
             results.push(result);
 
@@ -463,7 +466,7 @@ impl BaseBenchmark for FileIOBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Delete Files",
-                delete_ref,
+                refs.fileio.delete_files_per_sec,
                 iterations,
                 warmup,
                 timeout,
