@@ -40,63 +40,7 @@ pub fn get_system_info() -> SystemInfo {
 
 /// Get the platform release/version.
 fn get_platform_release() -> String {
-    #[cfg(target_os = "windows")]
-    {
-        if let Some(release) = get_windows_release() {
-            return release;
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        if let Some(release) = get_linux_release() {
-            return release;
-        }
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        if let Some(release) = get_macos_release() {
-            return release;
-        }
-    }
-
-    "Unknown".to_string()
-}
-
-#[cfg(target_os = "windows")]
-fn get_windows_release() -> Option<String> {
-    // Use winreg or systeminfo command
-    // For now, return a simple version
-    Some("Windows".to_string())
-}
-
-#[cfg(target_os = "linux")]
-fn get_linux_release() -> Option<String> {
-    // Read /etc/os-release
-    std::fs::read_to_string("/etc/os-release")
-        .ok()
-        .and_then(|content| {
-            content
-                .lines()
-                .find(|line| line.starts_with("PRETTY_NAME="))
-                .map(|line| {
-                    line.trim_start_matches("PRETTY_NAME=")
-                        .trim_matches('"')
-                        .to_string()
-                })
-        })
-}
-
-#[cfg(target_os = "macos")]
-fn get_macos_release() -> Option<String> {
-    // Use sw_vers command
-    std::process::Command::new("sw_vers")
-        .arg("-productVersion")
-        .output()
-        .ok()
-        .and_then(|output| String::from_utf8(output.stdout).ok())
-        .map(|version| format!("macOS {}", version.trim()))
+    System::long_os_version().unwrap_or_else(|| "Unknown".to_string())
 }
 
 /// Get GPU information.

@@ -362,10 +362,7 @@ impl BenchmarkRunner {
             "{}",
             style("────────────────────────────────────────").bright()
         );
-        println!(
-            "  Platform:     {} {}",
-            results.system_info.platform, results.system_info.platform_release
-        );
+        println!("  Platform:     {}", results.system_info.platform_release);
         if let Some(ref cpu) = results.system_info.cpu {
             println!("  CPU:          {}", cpu);
         }
