@@ -107,7 +107,7 @@ impl MLInferenceBenchmark {
             })?;
 
         let duration = start.elapsed().as_secs_f64();
-        Ok((num_batches * batch_size) as f64 / duration)
+        Ok(batch_size as f64 / duration)
     }
 }
 

@@ -192,7 +192,7 @@ impl ImageFiltersBenchmark {
             })?;
 
         let duration = start.elapsed().as_secs_f64();
-        Ok((num_images * width as usize * height as usize) as f64 / 1_000_000.0 / duration)
+        Ok((width as usize * height as usize) as f64 / 1_000_000.0 / duration)
     }
 }
 

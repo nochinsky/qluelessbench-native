@@ -7,6 +7,7 @@ use rand::Rng;
 use rayon::prelude::*;
 use std::fs;
 use std::io::{Read, Seek, SeekFrom, Write};
+use std::path::Path;
 use std::time::Instant;
 use tempfile::TempDir;
 
@@ -34,9 +35,8 @@ impl FileIOBenchmark {
     }
 
     /// Test sequential write performance.
-    fn test_sequential_write(size_mb: usize) -> Result<f64> {
-        let temp_dir = TempDir::new()?;
-        let file_path = temp_dir.path().join("sequential_write_test.bin");
+    fn test_sequential_write(temp_dir: &Path, size_mb: usize) -> Result<f64> {
+        let file_path = temp_dir.join("sequential_write_test.bin");
         let data = vec![0u8; size_mb * 1024 * 1024];
 
         let start = Instant::now();
@@ -50,9 +50,8 @@ impl FileIOBenchmark {
     }
 
     /// Test sequential read performance.
-    fn test_sequential_read(size_mb: usize) -> Result<f64> {
-        let temp_dir = TempDir::new()?;
-        let file_path = temp_dir.path().join("sequential_read_test.bin");
+    fn test_sequential_read(temp_dir: &Path, size_mb: usize) -> Result<f64> {
+        let file_path = temp_dir.join("sequential_read_test.bin");
 
         // Create test file
         let data = vec![0u8; size_mb * 1024 * 1024];
@@ -73,9 +72,12 @@ impl FileIOBenchmark {
     }
 
     /// Test random access performance.
-    fn test_random_access(file_size_mb: usize, num_accesses: usize) -> Result<f64> {
-        let temp_dir = TempDir::new()?;
-        let file_path = temp_dir.path().join("random_access_test.bin");
+    fn test_random_access(
+        temp_dir: &Path,
+        file_size_mb: usize,
+        num_accesses: usize,
+    ) -> Result<f64> {
+        let file_path = temp_dir.join("random_access_test.bin");
 
         // Create test file
         let data = vec![0u8; file_size_mb * 1024 * 1024];
@@ -103,10 +105,9 @@ impl FileIOBenchmark {
     }
 
     /// Test file copy performance.
-    fn test_copy(size_mb: usize) -> Result<f64> {
-        let temp_dir = TempDir::new()?;
-        let src_path = temp_dir.path().join("copy_source.bin");
-        let dst_path = temp_dir.path().join("copy_dest.bin");
+    fn test_copy(temp_dir: &Path, size_mb: usize) -> Result<f64> {
+        let src_path = temp_dir.join("copy_source.bin");
+        let dst_path = temp_dir.join("copy_dest.bin");
 
         // Create source file
         let data = vec![0u8; size_mb * 1024 * 1024];
@@ -125,12 +126,10 @@ impl FileIOBenchmark {
     }
 
     /// Test file delete performance.
-    fn test_delete(num_files: usize, file_size_kb: usize) -> Result<f64> {
-        let temp_dir = TempDir::new()?;
-
+    fn test_delete(temp_dir: &Path, num_files: usize, file_size_kb: usize) -> Result<f64> {
         // Create test files
         for i in 0..num_files {
-            let file_path = temp_dir.path().join(format!("delete_test_{}.bin", i));
+            let file_path = temp_dir.join(format!("delete_test_{}.bin", i));
             let data = vec![0u8; file_size_kb * 1024];
             let mut file = fs::File::create(&file_path)?;
             file.write_all(&data)?;
@@ -140,7 +139,7 @@ impl FileIOBenchmark {
         // Delete test
         let start = Instant::now();
         for i in 0..num_files {
-            let file_path = temp_dir.path().join(format!("delete_test_{}.bin", i));
+            let file_path = temp_dir.join(format!("delete_test_{}.bin", i));
             fs::remove_file(&file_path).ok();
         }
         let duration = start.elapsed().as_secs_f64();
@@ -152,14 +151,17 @@ impl FileIOBenchmark {
     /// Test parallel sequential write performance.
     /// Throughput model: Each worker writes the FULL data (100MB).
     /// N workers write N× the data in roughly the same time = N× speedup.
-    fn test_parallel_sequential_write(num_workers: usize, size_mb: usize) -> Result<f64> {
-        let temp_dir = TempDir::new()?;
+    fn test_parallel_sequential_write(
+        temp_dir: &Path,
+        num_workers: usize,
+        size_mb: usize,
+    ) -> Result<f64> {
         let start = Instant::now();
 
         (0..num_workers)
             .into_par_iter()
             .try_for_each(|i| -> Result<()> {
-                let file_path = temp_dir.path().join(format!("parallel_write_{}.bin", i));
+                let file_path = temp_dir.join(format!("parallel_write_{}.bin", i));
                 let data = vec![0u8; size_mb * 1024 * 1024];
                 let mut file = fs::File::create(&file_path)?;
                 file.write_all(&data)?;
@@ -175,12 +177,14 @@ impl FileIOBenchmark {
     /// Test parallel sequential read performance.
     /// Throughput model: Each worker reads the FULL data (100MB).
     /// N workers read N× the data in roughly the same time = N× speedup.
-    fn test_parallel_sequential_read(num_workers: usize, size_mb: usize) -> Result<f64> {
-        let temp_dir = TempDir::new()?;
-
+    fn test_parallel_sequential_read(
+        temp_dir: &Path,
+        num_workers: usize,
+        size_mb: usize,
+    ) -> Result<f64> {
         // Create test files (one per worker, each with full size)
         for i in 0..num_workers {
-            let file_path = temp_dir.path().join(format!("parallel_read_{}.bin", i));
+            let file_path = temp_dir.join(format!("parallel_read_{}.bin", i));
             let data = vec![0u8; size_mb * 1024 * 1024];
             let mut file = fs::File::create(&file_path)?;
             file.write_all(&data)?;
@@ -192,7 +196,7 @@ impl FileIOBenchmark {
         (0..num_workers)
             .into_par_iter()
             .try_for_each(|i| -> Result<()> {
-                let file_path = temp_dir.path().join(format!("parallel_read_{}.bin", i));
+                let file_path = temp_dir.join(format!("parallel_read_{}.bin", i));
                 let mut file = fs::File::open(&file_path)?;
                 let mut buffer = Vec::new();
                 file.read_to_end(&mut buffer)?;
@@ -208,15 +212,14 @@ impl FileIOBenchmark {
     /// Throughput model: Each worker does random reads on their own copy of the file.
     /// N workers do N× the accesses in roughly the same time = N× speedup.
     fn test_parallel_random_access(
+        temp_dir: &Path,
         num_workers: usize,
         file_size_mb: usize,
         num_accesses: usize,
     ) -> Result<f64> {
-        let temp_dir = TempDir::new()?;
-
         // Create a test file per worker
         for i in 0..num_workers {
-            let file_path = temp_dir.path().join(format!("random_src_{}.bin", i));
+            let file_path = temp_dir.join(format!("random_src_{}.bin", i));
             let data = vec![0u8; file_size_mb * 1024 * 1024];
             let mut file = fs::File::create(&file_path)?;
             file.write_all(&data)?;
@@ -228,7 +231,7 @@ impl FileIOBenchmark {
         (0..num_workers)
             .into_par_iter()
             .try_for_each(|i| -> Result<()> {
-                let file_path = temp_dir.path().join(format!("random_src_{}.bin", i));
+                let file_path = temp_dir.join(format!("random_src_{}.bin", i));
                 let mut rng = rand::thread_rng();
                 let mut file = fs::File::open(&file_path)?;
 
@@ -249,12 +252,10 @@ impl FileIOBenchmark {
     /// Test parallel file copy performance.
     /// Throughput model: Each worker copies the FULL data (50MB).
     /// N workers copy N× the data in roughly the same time = N× speedup.
-    fn test_parallel_copy(num_workers: usize, size_mb: usize) -> Result<f64> {
-        let temp_dir = TempDir::new()?;
-
+    fn test_parallel_copy(temp_dir: &Path, num_workers: usize, size_mb: usize) -> Result<f64> {
         // Create source files (one per worker, each with full size)
         for i in 0..num_workers {
-            let src_path = temp_dir.path().join(format!("copy_src_{}.bin", i));
+            let src_path = temp_dir.join(format!("copy_src_{}.bin", i));
             let data = vec![0u8; size_mb * 1024 * 1024];
             let mut file = fs::File::create(&src_path)?;
             file.write_all(&data)?;
@@ -266,8 +267,8 @@ impl FileIOBenchmark {
         (0..num_workers)
             .into_par_iter()
             .try_for_each(|i| -> Result<()> {
-                let src_path = temp_dir.path().join(format!("copy_src_{}.bin", i));
-                let dst_path = temp_dir.path().join(format!("copy_dst_{}.bin", i));
+                let src_path = temp_dir.join(format!("copy_src_{}.bin", i));
+                let dst_path = temp_dir.join(format!("copy_dst_{}.bin", i));
                 fs::copy(&src_path, &dst_path)?;
                 Ok(())
             })?;
@@ -281,32 +282,30 @@ impl FileIOBenchmark {
     /// Throughput model: Each worker deletes the FULL set of files (100 files).
     /// N workers delete N× the files in roughly the same time = N× speedup.
     fn test_parallel_delete(
+        temp_dirs: &[std::path::PathBuf],
         num_workers: usize,
         num_files: usize,
         file_size_kb: usize,
     ) -> Result<f64> {
-        let start = Instant::now();
-        let mut temp_dirs = Vec::new();
-
         // Create test files for each worker (each worker gets full set of files)
-        for _ in 0..num_workers {
-            let temp_dir = TempDir::new()?;
+        for temp_dir in temp_dirs.iter().take(num_workers) {
             for i in 0..num_files {
-                let file_path = temp_dir.path().join(format!("delete_test_{}.bin", i));
+                let file_path = temp_dir.join(format!("delete_test_{}.bin", i));
                 let data = vec![0u8; file_size_kb * 1024];
                 let mut file = fs::File::create(&file_path)?;
                 file.write_all(&data)?;
                 drop(file);
             }
-            temp_dirs.push(temp_dir);
         }
+
+        let start = Instant::now();
 
         // Delete in parallel (each worker deletes their own set of files)
         (0..num_workers)
             .into_par_iter()
             .try_for_each(|w| -> Result<()> {
                 for i in 0..num_files {
-                    let file_path = temp_dirs[w].path().join(format!("delete_test_{}.bin", i));
+                    let file_path = temp_dirs[w].join(format!("delete_test_{}.bin", i));
                     fs::remove_file(&file_path)?;
                 }
                 Ok(())
@@ -339,12 +338,13 @@ impl BaseBenchmark for FileIOBenchmark {
         let refs = ReferenceValues::load();
 
         if self.multi_core {
-            // Multi-core tests: parallel file operations with throughput model
-            // Each worker does the FULL work, N workers do N× the work
             let num_workers = get_parallel_workers();
+            let temp_dir = TempDir::new()?;
 
             // Test 1: Parallel Sequential Write (each worker writes 100MB)
-            let test_fn = || Self::test_parallel_sequential_write(num_workers, 100);
+            let temp_dir_path = temp_dir.path().to_path_buf();
+            let test_fn =
+                move || Self::test_parallel_sequential_write(&temp_dir_path, num_workers, 100);
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Write (100MB x {} workers)", num_workers),
@@ -357,7 +357,9 @@ impl BaseBenchmark for FileIOBenchmark {
             results.push(result);
 
             // Test 2: Parallel Sequential Read (each worker reads 100MB)
-            let test_fn = || Self::test_parallel_sequential_read(num_workers, 100);
+            let temp_dir_path = temp_dir.path().to_path_buf();
+            let test_fn =
+                move || Self::test_parallel_sequential_read(&temp_dir_path, num_workers, 100);
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Read (100MB x {} workers)", num_workers),
@@ -370,7 +372,9 @@ impl BaseBenchmark for FileIOBenchmark {
             results.push(result);
 
             // Test 3: Parallel Random Access (each worker does 1000 accesses on 100MB file)
-            let test_fn = || Self::test_parallel_random_access(num_workers, 100, 1000);
+            let temp_dir_path = temp_dir.path().to_path_buf();
+            let test_fn =
+                move || Self::test_parallel_random_access(&temp_dir_path, num_workers, 100, 1000);
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Random Access ({} workers)", num_workers),
@@ -383,7 +387,8 @@ impl BaseBenchmark for FileIOBenchmark {
             results.push(result);
 
             // Test 4: Parallel Copy (each worker copies 50MB)
-            let test_fn = || Self::test_parallel_copy(num_workers, 50);
+            let temp_dir_path = temp_dir.path().to_path_buf();
+            let test_fn = move || Self::test_parallel_copy(&temp_dir_path, num_workers, 50);
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Copy (50MB x {} workers)", num_workers),
@@ -396,7 +401,17 @@ impl BaseBenchmark for FileIOBenchmark {
             results.push(result);
 
             // Test 5: Parallel Delete (each worker deletes 100 files)
-            let test_fn = || Self::test_parallel_delete(num_workers, 100, 100);
+            let num_workers_clone = num_workers;
+            let mut temp_dirs = Vec::new();
+            for _ in 0..num_workers {
+                temp_dirs.push(TempDir::new()?);
+            }
+            let temp_dir_paths = temp_dirs
+                .iter()
+                .map(|d| d.path().to_path_buf())
+                .collect::<Vec<_>>();
+            let test_fn =
+                move || Self::test_parallel_delete(&temp_dir_paths, num_workers_clone, 100, 100);
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Delete (100 files x {} workers)", num_workers),
@@ -408,9 +423,12 @@ impl BaseBenchmark for FileIOBenchmark {
             total_duration += result.duration;
             results.push(result);
         } else {
-            // Single-core tests: sequential file operations
+            let temp_dir = TempDir::new()?;
+            let temp_dir_path = temp_dir.path();
+
             // Test 1: Sequential Write (100MB)
-            let test_fn = || Self::test_sequential_write(100);
+            let path = temp_dir_path.to_path_buf();
+            let test_fn = move || Self::test_sequential_write(&path, 100);
             let result = run_with_iterations(
                 test_fn,
                 "Sequential Write (100MB)",
@@ -423,7 +441,8 @@ impl BaseBenchmark for FileIOBenchmark {
             results.push(result);
 
             // Test 2: Sequential Read (100MB)
-            let test_fn = || Self::test_sequential_read(100);
+            let path = temp_dir_path.to_path_buf();
+            let test_fn = move || Self::test_sequential_read(&path, 100);
             let result = run_with_iterations(
                 test_fn,
                 "Sequential Read (100MB)",
@@ -436,7 +455,8 @@ impl BaseBenchmark for FileIOBenchmark {
             results.push(result);
 
             // Test 3: Random Access (100MB file, 1000 accesses)
-            let test_fn = || Self::test_random_access(100, 1000);
+            let path = temp_dir_path.to_path_buf();
+            let test_fn = move || Self::test_random_access(&path, 100, 1000);
             let result = run_with_iterations(
                 test_fn,
                 "Random Access",
@@ -449,7 +469,8 @@ impl BaseBenchmark for FileIOBenchmark {
             results.push(result);
 
             // Test 4: Copy Files (50MB)
-            let test_fn = || Self::test_copy(50);
+            let path = temp_dir_path.to_path_buf();
+            let test_fn = move || Self::test_copy(&path, 50);
             let result = run_with_iterations(
                 test_fn,
                 "Copy Files",
@@ -462,7 +483,8 @@ impl BaseBenchmark for FileIOBenchmark {
             results.push(result);
 
             // Test 5: Delete Files (100 files x 100KB)
-            let test_fn = || Self::test_delete(100, 100);
+            let path = temp_dir_path.to_path_buf();
+            let test_fn = move || Self::test_delete(&path, 100, 100);
             let result = run_with_iterations(
                 test_fn,
                 "Delete Files",
@@ -506,28 +528,32 @@ mod tests {
 
     #[test]
     fn test_sequential_write() {
-        let result = FileIOBenchmark::test_sequential_write(10);
+        let temp_dir = TempDir::new().unwrap();
+        let result = FileIOBenchmark::test_sequential_write(temp_dir.path(), 10);
         assert!(result.is_ok());
         assert!(result.unwrap() > 0.0);
     }
 
     #[test]
     fn test_sequential_read() {
-        let result = FileIOBenchmark::test_sequential_read(10);
+        let temp_dir = TempDir::new().unwrap();
+        let result = FileIOBenchmark::test_sequential_read(temp_dir.path(), 10);
         assert!(result.is_ok());
         assert!(result.unwrap() > 0.0);
     }
 
     #[test]
     fn test_copy() {
-        let result = FileIOBenchmark::test_copy(10);
+        let temp_dir = TempDir::new().unwrap();
+        let result = FileIOBenchmark::test_copy(temp_dir.path(), 10);
         assert!(result.is_ok());
         assert!(result.unwrap() > 0.0);
     }
 
     #[test]
     fn test_delete() {
-        let result = FileIOBenchmark::test_delete(10, 100);
+        let temp_dir = TempDir::new().unwrap();
+        let result = FileIOBenchmark::test_delete(temp_dir.path(), 10, 100);
         assert!(result.is_ok());
         assert!(result.unwrap() > 0.0);
     }

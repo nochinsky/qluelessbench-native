@@ -78,7 +78,7 @@ impl CryptoBenchmark {
             })?;
 
         let duration = start.elapsed().as_secs_f64();
-        Ok((num_chunks * chunk_size_mb) as f64 / duration)
+        Ok(chunk_size_mb as f64 / duration)
     }
 
     /// Test parallel SHA256 hashing.
@@ -93,7 +93,7 @@ impl CryptoBenchmark {
             })?;
 
         let duration = start.elapsed().as_secs_f64();
-        Ok((num_chunks * chunk_size_mb) as f64 / duration)
+        Ok(chunk_size_mb as f64 / duration)
     }
 }
 

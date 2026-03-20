@@ -208,7 +208,7 @@ impl NavigationBenchmark {
             })?;
 
         let duration = start.elapsed().as_secs_f64();
-        Ok((num_workers * routes_per_worker) as f64 / duration)
+        Ok(routes_per_worker as f64 / duration)
     }
 }
 

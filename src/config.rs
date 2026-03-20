@@ -54,6 +54,10 @@ pub struct Cli {
     /// Custom reference values config file path
     #[arg(long)]
     pub refs_file: Option<PathBuf>,
+
+    /// Filter to run only specific benchmark categories (comma-separated)
+    #[arg(long, value_delimiter = ',')]
+    pub category: Option<Vec<String>>,
 }
 
 /// Benchmark configuration.
@@ -79,6 +83,8 @@ pub struct BenchmarkConfig {
     pub generate_refs: bool,
     /// Custom reference values config file path
     pub refs_file: Option<PathBuf>,
+    /// Filter to run only specific benchmark categories
+    pub category_filter: Option<Vec<String>>,
 }
 
 impl Default for BenchmarkConfig {
@@ -94,6 +100,7 @@ impl Default for BenchmarkConfig {
             quick: false,
             generate_refs: false,
             refs_file: None,
+            category_filter: None,
         }
     }
 }
@@ -111,6 +118,7 @@ impl BenchmarkConfig {
             quick: cli.quick,
             generate_refs: cli.generate_refs,
             refs_file: cli.refs_file,
+            category_filter: cli.category,
         };
 
         if cli.quick {
@@ -156,6 +164,7 @@ mod tests {
             quick: false,
             generate_refs: false,
             refs_file: None,
+            category: None,
         };
         let config = BenchmarkConfig::from_cli(cli);
         assert_eq!(config.iterations, 5);
