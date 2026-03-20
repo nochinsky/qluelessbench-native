@@ -3,7 +3,7 @@
 //! Provides reliability classification, outlier detection, and statistical validity checks.
 
 use crate::stats::descriptive::{
-    calculate_coefficient_of_variation, calculate_mean, calculate_std_dev,
+    calculate_coefficient_of_variation, calculate_mean, calculate_percentile, calculate_std_dev,
 };
 use serde::{Deserialize, Serialize};
 
@@ -109,15 +109,8 @@ pub fn detect_outliers(values: &[f64]) -> Vec<usize> {
         return Vec::new();
     }
 
-    let mut sorted: Vec<(usize, f64)> = values.iter().copied().enumerate().collect();
-    sorted.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-
-    let n = sorted.len();
-    let q1_idx = n / 4;
-    let q3_idx = (3 * n) / 4;
-
-    let q1 = sorted[q1_idx].1;
-    let q3 = sorted[q3_idx].1;
+    let q1 = calculate_percentile(values, 25.0);
+    let q3 = calculate_percentile(values, 75.0);
     let iqr = q3 - q1;
 
     let lower_bound = q1 - 1.5 * iqr;

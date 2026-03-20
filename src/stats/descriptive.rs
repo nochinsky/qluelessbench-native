@@ -154,7 +154,7 @@ pub fn calculate_coefficient_of_variation(values: &[f64]) -> f64 {
 /// # use qluelessbench_native::stats::descriptive::calculate_geometric_mean;
 /// let values = vec![1.0, 2.0, 4.0, 8.0];
 /// let geo_mean = calculate_geometric_mean(&values);
-/// assert!((geo_mean - 2.83).abs() < 0.01);
+/// assert!((geo_mean - 2.828).abs() < 0.01);
 /// ```
 pub fn calculate_geometric_mean(values: &[f64]) -> f64 {
     if values.is_empty() {

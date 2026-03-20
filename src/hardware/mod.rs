@@ -2,27 +2,25 @@
 //!
 //! Provides system information including CPU, GPU, and memory.
 
-use crate::results::SystemInfo;
-use sysinfo::System;
+use crate::results::{StorageInfo, SystemInfo};
+use sysinfo::{Disks, System};
 
 /// Get comprehensive system information.
 pub fn get_system_info() -> SystemInfo {
     let mut sys = System::new_all();
     sys.refresh_all();
 
-    // Get CPU info
     let cpu = sys.cpus().first();
     let cpu_brand = cpu
         .map(|c| c.brand().to_string())
         .unwrap_or_else(|| "Unknown".to_string());
+    let cpu_frequency_mhz = cpu.map(|c| c.frequency());
     let cpu_count_logical = sys.cpus().len();
     let cpu_count_physical = sys.physical_core_count();
 
-    // Get memory info
     let memory_total = sys.total_memory();
     let memory_total_gb = memory_total as f64 / (1024.0 * 1024.0 * 1024.0);
 
-    // Get platform info
     let platform = std::env::consts::OS.to_string();
     let platform_release = get_platform_release();
 
@@ -30,11 +28,12 @@ pub fn get_system_info() -> SystemInfo {
         platform,
         platform_release,
         cpu: Some(cpu_brand),
+        cpu_frequency_mhz,
         cpu_count_logical,
         cpu_count_physical,
         memory_total_gb,
         gpu: get_gpu_info(),
-        storage: None,
+        storage: get_storage_info(),
     }
 }
 
@@ -62,6 +61,38 @@ fn get_gpu_info() -> Option<String> {
 
     #[allow(unreachable_code)]
     None
+}
+
+fn get_storage_info() -> Option<Vec<StorageInfo>> {
+    let disks = Disks::new_with_refreshed_list();
+    let disk_list: Vec<StorageInfo> = disks
+        .iter()
+        .map(|disk| {
+            let total_gb = disk.total_space() as f64 / (1024.0 * 1024.0 * 1024.0);
+            let disk_type = if disk.is_removable() {
+                "Removable".to_string()
+            } else {
+                match total_gb {
+                    t if t < 1.0 => "Unknown".to_string(),
+                    t if t < 128.0 => "SSD".to_string(),
+                    t if t < 500.0 => "HDD".to_string(),
+                    _ => "NVMe".to_string(),
+                }
+            };
+            StorageInfo {
+                r#type: disk_type,
+                total_gb,
+                is_primary: disk.mount_point().to_string_lossy() == "/"
+                    || disk.mount_point().to_string_lossy() == "C:\\",
+            }
+        })
+        .collect();
+
+    if disk_list.is_empty() {
+        None
+    } else {
+        Some(disk_list)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -131,12 +162,10 @@ fn get_windows_gpu_wmic() -> Option<String> {
 
 #[cfg(target_os = "linux")]
 fn get_linux_gpu() -> Option<String> {
-    // Strategy 1: lspci -nn (machine-parseable, available on most distros)
     if let Some(gpu) = get_linux_gpu_lspci() {
         return Some(gpu);
     }
 
-    // Strategy 2: /sys/class/drm fallback
     if let Some(gpu) = get_linux_gpu_sysfs() {
         return Some(gpu);
     }
@@ -146,51 +175,88 @@ fn get_linux_gpu() -> Option<String> {
 
 #[cfg(target_os = "linux")]
 fn get_linux_gpu_lspci() -> Option<String> {
-    // lspci -nn gives concise output like:
-    // 01:00.0 VGA compatible controller [0300]: NVIDIA Corporation ... [10de:xxxx] (rev a1)
-    std::process::Command::new("lspci")
+    let output = std::process::Command::new("lspci")
         .arg("-nn")
         .output()
         .ok()
-        .and_then(|output| String::from_utf8(output.stdout).ok())
-        .and_then(|output| {
-            output
-                .lines()
-                .find(|line| {
-                    let lower = line.to_lowercase();
-                    lower.contains("vga compatible controller")
-                        || lower.contains("3d controller")
-                        || lower.contains("display controller")
-                })
-                .map(|line| {
-                    // Format: "01:00.0 VGA compatible controller [0300]: NVIDIA Corporation ... [10de:xxxx]"
-                    // Extract everything between the first colon and the PCI ID brackets
-                    let after_first_colon = line.split(':').skip(1).collect::<Vec<_>>().join(":");
-                    let after_first_colon = after_first_colon.trim();
-                    // Strip trailing PCI ID like "[10de:2684]" and revision "(rev a1)"
-                    let cleaned = after_first_colon
-                        .split('[')
-                        .next()
-                        .unwrap_or(after_first_colon)
-                        .trim();
-                    // Remove trailing "(rev ...)" if present
-                    let cleaned = if let Some(pos) = cleaned.rfind("(rev") {
-                        cleaned[..pos].trim()
-                    } else {
-                        cleaned
-                    };
-                    cleaned.to_string()
-                })
+        .and_then(|output| String::from_utf8(output.stdout).ok())?;
+
+    let mut gpus: Vec<String> = output
+        .lines()
+        .filter(|line| {
+            let lower = line.to_lowercase();
+            lower.contains("vga compatible controller")
+                || lower.contains("3d controller")
+                || lower.contains("display controller")
         })
+        .filter_map(|line| {
+            let after_first_colon = line.split(':').skip(1).collect::<Vec<_>>().join(":");
+            let after_first_colon = after_first_colon.trim();
+            let cleaned = after_first_colon
+                .split('[')
+                .next()
+                .unwrap_or(after_first_colon)
+                .trim();
+            let cleaned = if let Some(pos) = cleaned.rfind("(rev") {
+                cleaned[..pos].trim()
+            } else {
+                cleaned
+            };
+            let gpu_name = cleaned.to_string();
+            let lower = gpu_name.to_lowercase();
+            if lower.contains("llvmpipe")
+                || lower.contains("software")
+                || lower.contains("virtio")
+                || lower.contains("vmware")
+            {
+                None
+            } else {
+                Some(gpu_name)
+            }
+        })
+        .collect();
+
+    if gpus.is_empty() {
+        None
+    } else {
+        Some(gpus.remove(0))
+    }
 }
 
 #[cfg(target_os = "linux")]
 fn get_linux_gpu_sysfs() -> Option<String> {
-    // Read GPU name from /sys/class/drm/card0/device/gpu_name or similar
-    std::fs::read_to_string("/sys/class/drm/card0/device/gpu_name")
-        .ok()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
+    for i in 0..4 {
+        let path = format!("/sys/class/drm/card{}/device/gpu_name", i);
+        if let Ok(name) = std::fs::read_to_string(&path) {
+            let name = name.trim().to_string();
+            if !name.is_empty() {
+                let lower = name.to_lowercase();
+                if !lower.contains("llvmpipe")
+                    && !lower.contains("software")
+                    && !lower.contains("virtio")
+                    && !lower.contains("vmware")
+                {
+                    return Some(name);
+                }
+            }
+        }
+
+        let path = format!("/sys/class/drm/card{}/device/name", i);
+        if let Ok(name) = std::fs::read_to_string(&path) {
+            let name = name.trim().to_string();
+            if !name.is_empty() {
+                let lower = name.to_lowercase();
+                if !lower.contains("llvmpipe")
+                    && !lower.contains("software")
+                    && !lower.contains("virtio")
+                    && !lower.contains("vmware")
+                {
+                    return Some(name);
+                }
+            }
+        }
+    }
+    None
 }
 
 // ---------------------------------------------------------------------------

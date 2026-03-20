@@ -129,6 +129,9 @@ pub struct SystemInfo {
     /// CPU model/name
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cpu: Option<String>,
+    /// CPU frequency in MHz
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_frequency_mhz: Option<u64>,
     /// Number of logical CPU cores
     pub cpu_count_logical: usize,
     /// Number of physical CPU cores

@@ -13,6 +13,7 @@ use crate::benchmarks::BenchmarkEntry;
 use crate::config::BenchmarkConfig;
 use crate::hardware::get_system_info;
 use crate::results::{BenchmarkMetadata, BenchmarkResults, CategoryResult};
+use crate::shutdown::is_interrupted;
 use crate::VERSION;
 
 /// Main benchmark runner.
@@ -32,6 +33,11 @@ impl BenchmarkRunner {
 
         // Print header
         self.print_header();
+
+        if self.config.quick {
+            println!("{}", style("⚠ QUICK SMOKE TEST MODE ⚠").yellow().bold());
+            println!("Running 3 categories with 1 iteration each for fast validation\n");
+        }
 
         // Get system info
         let system_info = get_system_info();
@@ -64,6 +70,18 @@ impl BenchmarkRunner {
         println!("\n{}", style("═══ Single-Core Tests ═══").bright());
 
         for (i, entry) in benchmarks.iter().enumerate() {
+            if is_interrupted() {
+                pb.finish_and_clear();
+                println!(
+                    "\n{}",
+                    style("Interrupted! Saving partial results...").yellow()
+                );
+                results.calculate_scores();
+                results.metadata.duration = start_time.elapsed().as_secs_f64();
+                self.save_results(&results);
+                return Ok(results);
+            }
+
             let msg = format!("[{}/{}] {}", i + 1, total, entry.name);
             pb.set_message(msg.clone());
 
@@ -95,6 +113,18 @@ impl BenchmarkRunner {
         println!("\n{}", style("═══ Multi-Core Tests ═══").bright());
 
         for (i, entry) in benchmarks.iter().enumerate() {
+            if is_interrupted() {
+                pb.finish_and_clear();
+                println!(
+                    "\n{}",
+                    style("Interrupted! Saving partial results...").yellow()
+                );
+                results.calculate_scores();
+                results.metadata.duration = start_time.elapsed().as_secs_f64();
+                self.save_results(&results);
+                return Ok(results);
+            }
+
             let msg = format!("[{}/{}] {}", i + 1, total, entry.name);
             pb.set_message(msg.clone());
 
@@ -185,6 +215,14 @@ impl BenchmarkRunner {
             MLInferenceBenchmark, MathematicalBenchmark, MemoryBenchmark, NavigationBenchmark,
             RayTracingBenchmark, TextProcessingBenchmark,
         };
+
+        if self.config.quick {
+            return vec![
+                benchmark_entry!("FileIO", FileIOBenchmark),
+                benchmark_entry!("Compression", CompressionBenchmark),
+                benchmark_entry!("Mathematical", MathematicalBenchmark),
+            ];
+        }
 
         vec![
             benchmark_entry!("FileIO", FileIOBenchmark),

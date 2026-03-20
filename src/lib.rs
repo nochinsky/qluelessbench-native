@@ -27,8 +27,10 @@
 pub mod benchmarks;
 pub mod config;
 pub mod hardware;
+pub mod references;
 pub mod results;
 pub mod runner;
+pub mod shutdown;
 pub mod stats;
 
 pub use config::BenchmarkConfig;

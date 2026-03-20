@@ -42,6 +42,18 @@ pub struct Cli {
     /// Print compact summary table instead of verbose output
     #[arg(short, long, default_value_t = false)]
     pub summary: bool,
+
+    /// Run quick smoke test (3 categories, 1 iteration) for fast validation
+    #[arg(long, default_value_t = false)]
+    pub quick: bool,
+
+    /// Generate default reference values config file and exit
+    #[arg(long, default_value_t = false)]
+    pub generate_refs: bool,
+
+    /// Custom reference values config file path
+    #[arg(long)]
+    pub refs_file: Option<PathBuf>,
 }
 
 /// Benchmark configuration.
@@ -61,6 +73,12 @@ pub struct BenchmarkConfig {
     pub compare_path: Option<PathBuf>,
     /// Print compact summary table
     pub summary: bool,
+    /// Run quick smoke test
+    pub quick: bool,
+    /// Generate reference values config file
+    pub generate_refs: bool,
+    /// Custom reference values config file path
+    pub refs_file: Option<PathBuf>,
 }
 
 impl Default for BenchmarkConfig {
@@ -73,14 +91,16 @@ impl Default for BenchmarkConfig {
             output_path: None,
             compare_path: None,
             summary: false,
+            quick: false,
+            generate_refs: false,
+            refs_file: None,
         }
     }
 }
 
 impl BenchmarkConfig {
-    /// Create a new BenchmarkConfig from CLI arguments.
     pub fn from_cli(cli: Cli) -> Self {
-        BenchmarkConfig {
+        let mut config = BenchmarkConfig {
             iterations: cli.iterations,
             warmup_iterations: cli.warmup,
             timeout_seconds: cli.timeout,
@@ -88,7 +108,18 @@ impl BenchmarkConfig {
             output_path: cli.output,
             compare_path: cli.compare,
             summary: cli.summary,
+            quick: cli.quick,
+            generate_refs: cli.generate_refs,
+            refs_file: cli.refs_file,
+        };
+
+        if cli.quick {
+            config.iterations = 1;
+            config.warmup_iterations = 0;
+            config.timeout_seconds = 10;
         }
+
+        config
     }
 }
 
@@ -122,6 +153,9 @@ mod tests {
             output: None,
             compare: None,
             summary: false,
+            quick: false,
+            generate_refs: false,
+            refs_file: None,
         };
         let config = BenchmarkConfig::from_cli(cli);
         assert_eq!(config.iterations, 5);
