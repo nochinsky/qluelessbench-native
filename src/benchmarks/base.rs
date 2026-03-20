@@ -18,6 +18,40 @@ pub fn get_parallel_workers() -> usize {
         .unwrap_or(8)
 }
 
+/// Suggested workload sizes scaled to the system's capabilities.
+///
+/// Use these to choose test data sizes that are appropriate for the machine.
+/// On low-end hardware, smaller sizes prevent timeouts. On high-end hardware,
+/// larger sizes produce more reliable (lower CV) measurements.
+pub struct WorkloadScale {
+    /// Logical CPU cores available.
+    pub cores: usize,
+    /// Scale factor: 1.0 = baseline (4 cores), higher for more cores.
+    pub factor: f64,
+}
+
+impl WorkloadScale {
+    /// Detect system capabilities and compute scale factor.
+    pub fn detect() -> Self {
+        let cores = get_parallel_workers();
+        // factor: 4 cores = 1.0, 8 cores = 2.0, 16 cores = 4.0, etc.
+        // Capped at 8x to avoid excessive allocations on massive machines.
+        let factor = (cores as f64 / 4.0).clamp(1.0, 8.0);
+        WorkloadScale { cores, factor }
+    }
+
+    /// Scale a base size by the system factor, clamped to a minimum.
+    pub fn scale(&self, base: usize) -> usize {
+        let scaled = (base as f64 * self.factor).round() as usize;
+        scaled.max(base)
+    }
+
+    /// Scale a base size with an explicit maximum cap.
+    pub fn scale_capped(&self, base: usize, max: usize) -> usize {
+        self.scale(base).min(max)
+    }
+}
+
 /// Calculate category score as average of test scores.
 pub fn calculate_category_score(results: &[TestResult]) -> f64 {
     if results.is_empty() {
@@ -43,6 +77,40 @@ pub trait BaseBenchmark {
         warmup: usize,
         timeout: u64,
     ) -> Result<crate::results::CategoryResult>;
+}
+
+/// A registered benchmark entry with single-core and multi-core variants.
+pub struct BenchmarkEntry {
+    pub name: &'static str,
+    pub single: Box<dyn BaseBenchmark>,
+    pub multi: Box<dyn BaseBenchmark>,
+}
+
+/// Macro to create a `BenchmarkEntry` from a benchmark type name.
+///
+/// The type must implement `BaseBenchmark` and have `new()` and `new_multi_core()`
+/// constructors. The category name is taken from the trait.
+///
+/// # Example
+///
+/// ```ignore
+/// benchmark_entry!(FileIOBenchmark, "FileIO")
+/// // Expands to:
+/// BenchmarkEntry {
+///     name: "FileIO",
+///     single: Box::new(FileIOBenchmark::new()),
+///     multi: Box::new(FileIOBenchmark::new_multi_core()),
+/// }
+/// ```
+#[macro_export]
+macro_rules! benchmark_entry {
+    ($name:expr, $ty:ty) => {
+        BenchmarkEntry {
+            name: $name,
+            single: Box::new(<$ty>::new()),
+            multi: Box::new(<$ty>::new_multi_core()),
+        }
+    };
 }
 
 /// Scoring direction for benchmark tests.

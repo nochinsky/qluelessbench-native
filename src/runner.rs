@@ -8,17 +8,11 @@ use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::time::Instant;
 
-use crate::benchmarks::{
-    ArchiveBenchmark, BaseBenchmark, CompressionBenchmark, ConcurrentBenchmark, CryptoBenchmark,
-    DatabaseBenchmark, FileIOBenchmark, ImageFiltersBenchmark, ImageProcessingBenchmark,
-    MLInferenceBenchmark, MathematicalBenchmark, MemoryBenchmark, NavigationBenchmark,
-    RayTracingBenchmark, TextProcessingBenchmark,
-};
+use crate::benchmark_entry;
+use crate::benchmarks::BenchmarkEntry;
 use crate::config::BenchmarkConfig;
 use crate::hardware::get_system_info;
 use crate::results::{BenchmarkMetadata, BenchmarkResults, CategoryResult};
-
-type BenchmarkPair = (&'static str, Box<dyn BaseBenchmark>, Box<dyn BaseBenchmark>);
 use crate::VERSION;
 
 /// Main benchmark runner.
@@ -69,11 +63,11 @@ impl BenchmarkRunner {
 
         println!("\n{}", style("═══ Single-Core Tests ═══").bright());
 
-        for (i, (name, single_core_bench, _multi_core_bench)) in benchmarks.iter().enumerate() {
-            let msg = format!("[{}/{}] {}", i + 1, total, name);
+        for (i, entry) in benchmarks.iter().enumerate() {
+            let msg = format!("[{}/{}] {}", i + 1, total, entry.name);
             pb.set_message(msg.clone());
 
-            let category_result = single_core_bench.run_all(
+            let category_result = entry.single.run_all(
                 self.config.iterations,
                 self.config.warmup_iterations,
                 self.config.timeout_seconds,
@@ -81,16 +75,16 @@ impl BenchmarkRunner {
 
             match category_result {
                 Ok(result) => {
-                    self.print_category_result(name, &result);
+                    self.print_category_result(entry.name, &result);
                     results.single_core_categories.push(result);
                 }
                 Err(e) => {
-                    self.print_category_error(name, &e.to_string());
+                    self.print_category_error(entry.name, &e.to_string());
                     results.single_core_categories.push(CategoryResult {
-                        category: name.to_string(),
+                        category: entry.name.to_string(),
                         score: 0.0,
                         duration: 0.0,
-                        weight: single_core_bench.weight(),
+                        weight: entry.single.weight(),
                         tests: Vec::new(),
                     });
                 }
@@ -100,11 +94,11 @@ impl BenchmarkRunner {
 
         println!("\n{}", style("═══ Multi-Core Tests ═══").bright());
 
-        for (i, (name, _single_core_bench, multi_core_bench)) in benchmarks.iter().enumerate() {
-            let msg = format!("[{}/{}] {}", i + 1, total, name);
+        for (i, entry) in benchmarks.iter().enumerate() {
+            let msg = format!("[{}/{}] {}", i + 1, total, entry.name);
             pb.set_message(msg.clone());
 
-            let category_result = multi_core_bench.run_all(
+            let category_result = entry.multi.run_all(
                 self.config.iterations,
                 self.config.warmup_iterations,
                 self.config.timeout_seconds,
@@ -112,16 +106,16 @@ impl BenchmarkRunner {
 
             match category_result {
                 Ok(result) => {
-                    self.print_category_result(name, &result);
+                    self.print_category_result(entry.name, &result);
                     results.multi_core_categories.push(result);
                 }
                 Err(e) => {
-                    self.print_category_error(name, &e.to_string());
+                    self.print_category_error(entry.name, &e.to_string());
                     results.multi_core_categories.push(CategoryResult {
-                        category: name.to_string(),
+                        category: entry.name.to_string(),
                         score: 0.0,
                         duration: 0.0,
-                        weight: multi_core_bench.weight(),
+                        weight: entry.multi.weight(),
                         tests: Vec::new(),
                     });
                 }
@@ -180,78 +174,29 @@ impl BenchmarkRunner {
     }
 
     /// Get all benchmark categories.
-    fn get_all_benchmarks(&self) -> Vec<BenchmarkPair> {
+    fn get_all_benchmarks(&self) -> Vec<BenchmarkEntry> {
+        use crate::benchmarks::{
+            ArchiveBenchmark, CompressionBenchmark, ConcurrentBenchmark, CryptoBenchmark,
+            DatabaseBenchmark, FileIOBenchmark, ImageFiltersBenchmark, ImageProcessingBenchmark,
+            MLInferenceBenchmark, MathematicalBenchmark, MemoryBenchmark, NavigationBenchmark,
+            RayTracingBenchmark, TextProcessingBenchmark,
+        };
+
         vec![
-            (
-                "FileIO",
-                Box::new(FileIOBenchmark::new()),
-                Box::new(FileIOBenchmark::new_multi_core()),
-            ),
-            (
-                "Compression",
-                Box::new(CompressionBenchmark::new()),
-                Box::new(CompressionBenchmark::new_multi_core()),
-            ),
-            (
-                "ImageProcessing",
-                Box::new(ImageProcessingBenchmark::new()),
-                Box::new(ImageProcessingBenchmark::new_multi_core()),
-            ),
-            (
-                "TextProcessing",
-                Box::new(TextProcessingBenchmark::new()),
-                Box::new(TextProcessingBenchmark::new_multi_core()),
-            ),
-            (
-                "Database",
-                Box::new(DatabaseBenchmark::new()),
-                Box::new(DatabaseBenchmark::new_multi_core()),
-            ),
-            (
-                "Mathematical",
-                Box::new(MathematicalBenchmark::new()),
-                Box::new(MathematicalBenchmark::new_multi_core()),
-            ),
-            (
-                "Archive",
-                Box::new(ArchiveBenchmark::new()),
-                Box::new(ArchiveBenchmark::new_multi_core()),
-            ),
-            (
-                "Memory",
-                Box::new(MemoryBenchmark::new()),
-                Box::new(MemoryBenchmark::new_multi_core()),
-            ),
-            (
-                "Concurrent",
-                Box::new(ConcurrentBenchmark::new()),
-                Box::new(ConcurrentBenchmark::new_multi_core()),
-            ),
-            (
-                "Cryptography",
-                Box::new(CryptoBenchmark::new()),
-                Box::new(CryptoBenchmark::new_multi_core()),
-            ),
-            (
-                "RayTracing",
-                Box::new(RayTracingBenchmark::new()),
-                Box::new(RayTracingBenchmark::new_multi_core()),
-            ),
-            (
-                "MLInference",
-                Box::new(MLInferenceBenchmark::new()),
-                Box::new(MLInferenceBenchmark::new_multi_core()),
-            ),
-            (
-                "Navigation",
-                Box::new(NavigationBenchmark::new()),
-                Box::new(NavigationBenchmark::new_multi_core()),
-            ),
-            (
-                "ImageFilters",
-                Box::new(ImageFiltersBenchmark::new()),
-                Box::new(ImageFiltersBenchmark::new_multi_core()),
-            ),
+            benchmark_entry!("FileIO", FileIOBenchmark),
+            benchmark_entry!("Compression", CompressionBenchmark),
+            benchmark_entry!("ImageProcessing", ImageProcessingBenchmark),
+            benchmark_entry!("TextProcessing", TextProcessingBenchmark),
+            benchmark_entry!("Database", DatabaseBenchmark),
+            benchmark_entry!("Mathematical", MathematicalBenchmark),
+            benchmark_entry!("Archive", ArchiveBenchmark),
+            benchmark_entry!("Memory", MemoryBenchmark),
+            benchmark_entry!("Concurrent", ConcurrentBenchmark),
+            benchmark_entry!("Cryptography", CryptoBenchmark),
+            benchmark_entry!("RayTracing", RayTracingBenchmark),
+            benchmark_entry!("MLInference", MLInferenceBenchmark),
+            benchmark_entry!("Navigation", NavigationBenchmark),
+            benchmark_entry!("ImageFilters", ImageFiltersBenchmark),
         ]
     }
 

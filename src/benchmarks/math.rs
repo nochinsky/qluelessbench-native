@@ -9,6 +9,7 @@ use std::time::Instant;
 
 use crate::benchmarks::base::{
     calculate_category_score, get_parallel_workers, run_with_iterations, BaseBenchmark,
+    WorkloadScale,
 };
 use crate::results::CategoryResult;
 
@@ -30,8 +31,7 @@ impl MathematicalBenchmark {
     }
 
     /// Test NumPy-like array operations.
-    fn test_array_ops() -> Result<f64> {
-        let size = 1000;
+    fn test_array_ops(size: usize) -> Result<f64> {
         let mut arr = Array1::from_elem(size, 1.0);
 
         let start = Instant::now();
@@ -53,8 +53,7 @@ impl MathematicalBenchmark {
     }
 
     /// Test matrix multiplication.
-    fn test_matrix_multiplication() -> Result<f64> {
-        let size = 200;
+    fn test_matrix_multiplication(size: usize) -> Result<f64> {
         let a = Array2::from_elem((size, size), 2.0);
         let b = Array2::from_elem((size, size), 3.0);
 
@@ -66,8 +65,7 @@ impl MathematicalBenchmark {
     }
 
     /// Test statistics calculations.
-    fn test_statistics() -> Result<f64> {
-        let size = 10000;
+    fn test_statistics(size: usize) -> Result<f64> {
         let data: Vec<f64> = (0..size).map(|i| i as f64).collect();
 
         let start = Instant::now();
@@ -94,9 +92,7 @@ impl MathematicalBenchmark {
     }
 
     /// Test prime number generation (Sieve of Eratosthenes).
-    fn test_prime_generation() -> Result<f64> {
-        let limit = 100000;
-
+    fn test_prime_generation(limit: usize) -> Result<f64> {
         let start = Instant::now();
 
         let mut is_prime = vec![true; limit + 1];
@@ -124,8 +120,7 @@ impl MathematicalBenchmark {
     /// Test parallel array operations.
     /// Throughput model: Each worker does the FULL work (1000 elements).
     /// N workers do N× the work in roughly the same time = N× speedup.
-    fn test_parallel_array_ops(num_workers: usize) -> Result<f64> {
-        let size = 1000; // Each worker processes full size
+    fn test_parallel_array_ops(num_workers: usize, size: usize) -> Result<f64> {
         let start = Instant::now();
 
         (0..num_workers)
@@ -152,10 +147,9 @@ impl MathematicalBenchmark {
     }
 
     /// Test parallel matrix multiplication.
-    /// Throughput model: Each worker does the FULL work (200x200 matrix multiply).
+    /// Throughput model: Each worker does the FULL work.
     /// N workers do N× the work in roughly the same time = N× speedup.
-    fn test_parallel_matrix_multiplication(num_workers: usize) -> Result<f64> {
-        let size = 200; // Each worker does full size matrix multiply
+    fn test_parallel_matrix_multiplication(num_workers: usize, size: usize) -> Result<f64> {
         let start = Instant::now();
 
         (0..num_workers)
@@ -173,10 +167,9 @@ impl MathematicalBenchmark {
     }
 
     /// Test parallel statistics calculations.
-    /// Throughput model: Each worker does the FULL work (10000 elements).
+    /// Throughput model: Each worker does the FULL work.
     /// N workers do N× the work in roughly the same time = N× speedup.
-    fn test_parallel_statistics(num_workers: usize) -> Result<f64> {
-        let size = 10000; // Each worker processes full size
+    fn test_parallel_statistics(num_workers: usize, size: usize) -> Result<f64> {
         let start = Instant::now();
 
         (0..num_workers)
@@ -201,10 +194,9 @@ impl MathematicalBenchmark {
     }
 
     /// Test parallel prime number generation.
-    /// Throughput model: Each worker does the FULL work (find primes up to 100000).
+    /// Throughput model: Each worker does the FULL work.
     /// N workers do N× the work in roughly the same time = N× speedup.
-    fn test_parallel_prime_generation(num_workers: usize) -> Result<f64> {
-        let limit = 100000; // Each worker finds primes up to full limit
+    fn test_parallel_prime_generation(num_workers: usize, limit: usize) -> Result<f64> {
         let start = Instant::now();
 
         (0..num_workers)
@@ -254,12 +246,18 @@ impl BaseBenchmark for MathematicalBenchmark {
         // Reference values (operations per second)
         // Same reference values used for both single-core and multi-core modes
         let (array_ref, matrix_ref, stats_ref, prime_ref) = (50000.0, 50.0, 5000.0, 500.0);
+        let scale = WorkloadScale::detect();
+
+        // Base sizes scaled by system capabilities
+        let array_size = scale.scale_capped(1000, 8000);
+        let matrix_size = scale.scale_capped(200, 400);
+        let stats_size = scale.scale_capped(10_000, 80_000);
+        let prime_limit = scale.scale_capped(100_000, 800_000);
 
         if self.multi_core {
-            // Multi-core: parallel mathematical operations with SAME total work as single-core
             let num_workers = get_parallel_workers();
 
-            let test_fn = || Self::test_parallel_array_ops(num_workers);
+            let test_fn = || Self::test_parallel_array_ops(num_workers, array_size);
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel NumPy Array Ops ({} workers)", num_workers),
@@ -271,7 +269,7 @@ impl BaseBenchmark for MathematicalBenchmark {
             total_duration += result.duration;
             results.push(result);
 
-            let test_fn = || Self::test_parallel_matrix_multiplication(num_workers);
+            let test_fn = || Self::test_parallel_matrix_multiplication(num_workers, matrix_size);
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Matrix Multiplication ({} workers)", num_workers),
@@ -283,7 +281,7 @@ impl BaseBenchmark for MathematicalBenchmark {
             total_duration += result.duration;
             results.push(result);
 
-            let test_fn = || Self::test_parallel_statistics(num_workers);
+            let test_fn = || Self::test_parallel_statistics(num_workers, stats_size);
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Statistics ({} workers)", num_workers),
@@ -295,7 +293,7 @@ impl BaseBenchmark for MathematicalBenchmark {
             total_duration += result.duration;
             results.push(result);
 
-            let test_fn = || Self::test_parallel_prime_generation(num_workers);
+            let test_fn = || Self::test_parallel_prime_generation(num_workers, prime_limit);
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Prime Generation ({} workers)", num_workers),
@@ -308,8 +306,7 @@ impl BaseBenchmark for MathematicalBenchmark {
             results.push(result);
         } else {
             // Single-core tests
-            // Test 1: Array Operations
-            let test_fn = || Self::test_array_ops();
+            let test_fn = || Self::test_array_ops(array_size);
             let result = run_with_iterations(
                 test_fn,
                 "NumPy Array Ops",
@@ -321,8 +318,7 @@ impl BaseBenchmark for MathematicalBenchmark {
             total_duration += result.duration;
             results.push(result);
 
-            // Test 2: Matrix Multiplication
-            let test_fn = || Self::test_matrix_multiplication();
+            let test_fn = || Self::test_matrix_multiplication(matrix_size);
             let result = run_with_iterations(
                 test_fn,
                 "Matrix Multiplication",
@@ -334,8 +330,7 @@ impl BaseBenchmark for MathematicalBenchmark {
             total_duration += result.duration;
             results.push(result);
 
-            // Test 3: Statistics
-            let test_fn = || Self::test_statistics();
+            let test_fn = || Self::test_statistics(stats_size);
             let result = run_with_iterations(
                 test_fn,
                 "Statistics",
@@ -347,8 +342,7 @@ impl BaseBenchmark for MathematicalBenchmark {
             total_duration += result.duration;
             results.push(result);
 
-            // Test 4: Prime Generation
-            let test_fn = || Self::test_prime_generation();
+            let test_fn = || Self::test_prime_generation(prime_limit);
             let result = run_with_iterations(
                 test_fn,
                 "Prime Generation",
@@ -386,28 +380,28 @@ mod tests {
 
     #[test]
     fn test_array_ops() {
-        let result = MathematicalBenchmark::test_array_ops();
+        let result = MathematicalBenchmark::test_array_ops(1000);
         assert!(result.is_ok());
         assert!(result.unwrap() > 0.0);
     }
 
     #[test]
     fn test_matrix_multiplication() {
-        let result = MathematicalBenchmark::test_matrix_multiplication();
+        let result = MathematicalBenchmark::test_matrix_multiplication(200);
         assert!(result.is_ok());
         assert!(result.unwrap() > 0.0);
     }
 
     #[test]
     fn test_prime_generation() {
-        let result = MathematicalBenchmark::test_prime_generation();
+        let result = MathematicalBenchmark::test_prime_generation(100_000);
         assert!(result.is_ok());
         assert!(result.unwrap() > 0.0);
     }
 
     #[test]
     fn test_statistics() {
-        let result = MathematicalBenchmark::test_statistics();
+        let result = MathematicalBenchmark::test_statistics(10_000);
         assert!(result.is_ok());
         assert!(result.unwrap() > 0.0);
     }
@@ -421,28 +415,28 @@ mod tests {
 
     #[test]
     fn test_parallel_array_ops() {
-        let result = MathematicalBenchmark::test_parallel_array_ops(2);
+        let result = MathematicalBenchmark::test_parallel_array_ops(2, 1000);
         assert!(result.is_ok());
         assert!(result.unwrap() > 0.0);
     }
 
     #[test]
     fn test_parallel_matrix_multiplication() {
-        let result = MathematicalBenchmark::test_parallel_matrix_multiplication(2);
+        let result = MathematicalBenchmark::test_parallel_matrix_multiplication(2, 200);
         assert!(result.is_ok());
         assert!(result.unwrap() > 0.0);
     }
 
     #[test]
     fn test_parallel_statistics() {
-        let result = MathematicalBenchmark::test_parallel_statistics(2);
+        let result = MathematicalBenchmark::test_parallel_statistics(2, 10_000);
         assert!(result.is_ok());
         assert!(result.unwrap() > 0.0);
     }
 
     #[test]
     fn test_parallel_prime_generation() {
-        let result = MathematicalBenchmark::test_parallel_prime_generation(2);
+        let result = MathematicalBenchmark::test_parallel_prime_generation(2, 100_000);
         assert!(result.is_ok());
         assert!(result.unwrap() > 0.0);
     }

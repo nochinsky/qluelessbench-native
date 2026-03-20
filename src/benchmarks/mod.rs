@@ -33,7 +33,7 @@ pub mod raytrace;
 pub mod text;
 
 pub use archive::ArchiveBenchmark;
-pub use base::BaseBenchmark;
+pub use base::{BaseBenchmark, BenchmarkEntry, WorkloadScale};
 pub use compression::CompressionBenchmark;
 pub use concurrent::ConcurrentBenchmark;
 pub use crypto::CryptoBenchmark;

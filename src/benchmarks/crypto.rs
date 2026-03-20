@@ -11,6 +11,7 @@ use std::time::Instant;
 
 use crate::benchmarks::base::{
     calculate_category_score, get_parallel_workers, run_with_iterations, BaseBenchmark,
+    WorkloadScale,
 };
 use crate::results::CategoryResult;
 
@@ -113,6 +114,7 @@ impl BaseBenchmark for CryptoBenchmark {
     fn run_all(&self, iterations: usize, warmup: usize, timeout: u64) -> Result<CategoryResult> {
         let mut results = Vec::new();
         let mut total_duration = 0.0;
+        let scale = WorkloadScale::detect();
 
         // Reference values (MB/s - calibrated for typical modern CPU)
         let aes_ref = 500.0;
@@ -120,7 +122,7 @@ impl BaseBenchmark for CryptoBenchmark {
 
         if self.multi_core {
             let num_workers = get_parallel_workers();
-            let chunk_size = 10; // MB per worker
+            let chunk_size = scale.scale_capped(10, 50); // 10-50 MB per worker based on cores
 
             // Multi-core: Parallel AES encryption
             let test_fn = || Self::test_parallel_aes_encrypt(num_workers, chunk_size);
@@ -148,8 +150,10 @@ impl BaseBenchmark for CryptoBenchmark {
             total_duration += result.duration;
             results.push(result);
         } else {
+            let data_size_mb = scale.scale_capped(50, 200); // 50-200 MB based on cores
+
             // Single-core: AES encryption
-            let test_fn = || Self::test_aes_encrypt(50);
+            let test_fn = || Self::test_aes_encrypt(data_size_mb);
             let result = run_with_iterations(
                 test_fn,
                 "AES-256 Encrypt",
@@ -162,7 +166,7 @@ impl BaseBenchmark for CryptoBenchmark {
             results.push(result);
 
             // Single-core: SHA256
-            let test_fn = || Self::test_sha256(50);
+            let test_fn = || Self::test_sha256(data_size_mb);
             let result = run_with_iterations(
                 test_fn,
                 "SHA256 Hash",
