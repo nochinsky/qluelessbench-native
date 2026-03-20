@@ -15,6 +15,7 @@ use tempfile::TempDir;
 use crate::benchmarks::base::{
     calculate_category_score, get_parallel_workers, run_with_iterations, BaseBenchmark,
 };
+use crate::references::ReferenceValues;
 use crate::results::CategoryResult;
 
 /// Concurrent benchmark.
@@ -220,6 +221,7 @@ impl BaseBenchmark for ConcurrentBenchmark {
     fn run_all(&self, iterations: usize, warmup: usize, timeout: u64) -> Result<CategoryResult> {
         let mut results = Vec::new();
         let mut total_duration = 0.0;
+        let refs = ReferenceValues::load();
 
         let num_workers = get_parallel_workers();
         let thread_count = if self.multi_core { num_workers } else { 1 };
@@ -231,7 +233,7 @@ impl BaseBenchmark for ConcurrentBenchmark {
         let result = run_with_iterations(
             test_fn,
             &format!("Threaded File I/O ({} threads)", thread_count),
-            200.0,
+            refs.concurrent.threaded_file_io_mbps,
             iterations,
             warmup,
             timeout,
@@ -245,7 +247,7 @@ impl BaseBenchmark for ConcurrentBenchmark {
         let result = run_with_iterations(
             test_fn,
             &format!("Channel Messaging ({} workers)", thread_count),
-            5_000_000.0,
+            refs.concurrent.channel_messaging_ops,
             iterations,
             warmup,
             timeout,
@@ -258,7 +260,7 @@ impl BaseBenchmark for ConcurrentBenchmark {
         let result = run_with_iterations(
             test_fn,
             &format!("Concurrent Map Build ({} threads)", thread_count),
-            500_000.0,
+            refs.concurrent.concurrent_map_build_ops,
             iterations,
             warmup,
             timeout,
@@ -272,7 +274,7 @@ impl BaseBenchmark for ConcurrentBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Merge Sort ({} threads)", thread_count),
-                100_000.0,
+                refs.concurrent.parallel_sort_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -293,7 +295,7 @@ impl BaseBenchmark for ConcurrentBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Sequential Sort",
-                100_000.0,
+                refs.concurrent.parallel_sort_mbps,
                 iterations,
                 warmup,
                 timeout,

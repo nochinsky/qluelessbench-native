@@ -6,7 +6,10 @@ use anyhow::Result;
 use rayon::prelude::*;
 use std::time::Instant;
 
-use crate::benchmarks::base::{calculate_category_score, run_with_iterations, BaseBenchmark};
+use crate::benchmarks::base::{
+    calculate_category_score, get_parallel_workers, run_with_iterations, BaseBenchmark,
+};
+use crate::references::ReferenceValues;
 use crate::results::CategoryResult;
 
 /// Simple vector type.
@@ -149,7 +152,7 @@ impl RayTracingBenchmark {
     }
 
     /// Test ray tracing performance (multi-core, parallel).
-    fn test_ray_trace(width: usize, height: usize) -> Result<f64> {
+    fn test_ray_trace(width: usize, height: usize, num_workers: usize) -> Result<f64> {
         let spheres = vec![
             Sphere {
                 center: Vec3::new(0.0, 0.0, -3.0),
@@ -175,7 +178,7 @@ impl RayTracingBenchmark {
         let duration = start.elapsed().as_secs_f64();
         let total_pixels = width * height;
 
-        Ok(total_pixels as f64 / 1_000_000.0 / duration)
+        Ok(total_pixels as f64 / 1_000_000.0 / duration / num_workers as f64)
     }
 }
 
@@ -197,18 +200,16 @@ impl BaseBenchmark for RayTracingBenchmark {
     fn run_all(&self, iterations: usize, warmup: usize, timeout: u64) -> Result<CategoryResult> {
         let mut results = Vec::new();
         let mut total_duration = 0.0;
-
-        // Reference values (megapixels/second)
-        let single_core_ref = 2.0; // 2 MP/s for single-core
-        let multi_core_ref = 20.0; // 20 MP/s for multi-core (10x)
+        let refs = ReferenceValues::load();
 
         if self.multi_core {
+            let num_workers = get_parallel_workers();
             // Multi-core: Higher resolution with parallel rendering
-            let test_fn = || Self::test_ray_trace(1024, 1024);
+            let test_fn = || Self::test_ray_trace(1024, 1024, num_workers);
             let result = run_with_iterations(
                 test_fn,
                 "Ray Tracing (1024x1024)",
-                multi_core_ref,
+                refs.ray_tracing.multi_core_megapixels_per_sec,
                 iterations,
                 warmup,
                 timeout,
@@ -221,7 +222,7 @@ impl BaseBenchmark for RayTracingBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Ray Tracing (512x512)",
-                single_core_ref,
+                refs.ray_tracing.single_core_megapixels_per_sec,
                 iterations,
                 warmup,
                 timeout,
@@ -325,7 +326,7 @@ mod tests {
 
     #[test]
     fn test_ray_trace() {
-        let result = RayTracingBenchmark::test_ray_trace(64, 64);
+        let result = RayTracingBenchmark::test_ray_trace(64, 64, 1);
         assert!(result.is_ok());
         assert!(result.unwrap() >= 0.0);
     }

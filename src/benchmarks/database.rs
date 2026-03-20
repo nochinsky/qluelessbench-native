@@ -10,6 +10,7 @@ use std::time::Instant;
 use crate::benchmarks::base::{
     calculate_category_score, get_parallel_workers, run_with_iterations, BaseBenchmark,
 };
+use crate::references::ReferenceValues;
 use crate::results::CategoryResult;
 
 /// Database benchmark.
@@ -418,11 +419,7 @@ impl BaseBenchmark for DatabaseBenchmark {
     fn run_all(&self, iterations: usize, warmup: usize, timeout: u64) -> Result<CategoryResult> {
         let mut results = Vec::new();
         let mut total_duration = 0.0;
-
-        // Reference values (operations per second)
-        // Same reference values used for both single-core and multi-core modes
-        let (insert_ref, search_ref, update_ref, delete_ref, indexed_ref) =
-            (10000.0, 5000.0, 5000.0, 5000.0, 10000.0);
+        let refs = ReferenceValues::load();
 
         if self.multi_core {
             // Multi-core: parallel database operations with SAME total work as single-core
@@ -435,7 +432,7 @@ impl BaseBenchmark for DatabaseBenchmark {
                     "Parallel Import Records (1000 records / {} connections)",
                     num_workers
                 ),
-                insert_ref,
+                refs.database.insert_ops,
                 iterations,
                 warmup,
                 timeout,
@@ -450,7 +447,7 @@ impl BaseBenchmark for DatabaseBenchmark {
                     "Parallel Search Users (5000 records / {} connections)",
                     num_workers
                 ),
-                search_ref,
+                refs.database.search_ops,
                 iterations,
                 warmup,
                 timeout,
@@ -465,7 +462,7 @@ impl BaseBenchmark for DatabaseBenchmark {
                     "Parallel Update Profiles (500 updates / {} connections)",
                     num_workers
                 ),
-                update_ref,
+                refs.database.update_ops,
                 iterations,
                 warmup,
                 timeout,
@@ -480,7 +477,7 @@ impl BaseBenchmark for DatabaseBenchmark {
                     "Parallel Delete Records (500 deletes / {} connections)",
                     num_workers
                 ),
-                delete_ref,
+                refs.database.delete_ops,
                 iterations,
                 warmup,
                 timeout,
@@ -492,7 +489,7 @@ impl BaseBenchmark for DatabaseBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Indexed Lookup ({} connections)", num_workers),
-                indexed_ref,
+                refs.database.indexed_lookup_ops,
                 iterations,
                 warmup,
                 timeout,
@@ -506,7 +503,7 @@ impl BaseBenchmark for DatabaseBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Import Records",
-                insert_ref,
+                refs.database.insert_ops,
                 iterations,
                 warmup,
                 timeout,
@@ -519,7 +516,7 @@ impl BaseBenchmark for DatabaseBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Search Users",
-                search_ref,
+                refs.database.search_ops,
                 iterations,
                 warmup,
                 timeout,
@@ -532,7 +529,7 @@ impl BaseBenchmark for DatabaseBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Update Profiles",
-                update_ref,
+                refs.database.update_ops,
                 iterations,
                 warmup,
                 timeout,
@@ -545,7 +542,7 @@ impl BaseBenchmark for DatabaseBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Delete Records",
-                delete_ref,
+                refs.database.delete_ops,
                 iterations,
                 warmup,
                 timeout,
@@ -558,7 +555,7 @@ impl BaseBenchmark for DatabaseBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Indexed Lookup",
-                indexed_ref,
+                refs.database.indexed_lookup_ops,
                 iterations,
                 warmup,
                 timeout,

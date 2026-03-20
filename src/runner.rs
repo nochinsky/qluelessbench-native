@@ -13,6 +13,7 @@ use crate::benchmarks::BenchmarkEntry;
 use crate::config::BenchmarkConfig;
 use crate::hardware::get_system_info;
 use crate::results::{BenchmarkMetadata, BenchmarkResults, CategoryResult};
+use crate::shutdown::is_interrupted;
 use crate::VERSION;
 
 /// Main benchmark runner.
@@ -32,6 +33,11 @@ impl BenchmarkRunner {
 
         // Print header
         self.print_header();
+
+        if self.config.quick {
+            println!("{}", style("⚠ QUICK SMOKE TEST MODE ⚠").yellow().bold());
+            println!("Running 3 categories with 1 iteration each for fast validation\n");
+        }
 
         // Get system info
         let system_info = get_system_info();
@@ -64,6 +70,18 @@ impl BenchmarkRunner {
         println!("\n{}", style("═══ Single-Core Tests ═══").bright());
 
         for (i, entry) in benchmarks.iter().enumerate() {
+            if is_interrupted() {
+                pb.finish_and_clear();
+                println!(
+                    "\n{}",
+                    style("Interrupted! Saving partial results...").yellow()
+                );
+                results.calculate_scores();
+                results.metadata.duration = start_time.elapsed().as_secs_f64();
+                self.save_results(&results);
+                return Ok(results);
+            }
+
             let msg = format!("[{}/{}] {}", i + 1, total, entry.name);
             pb.set_message(msg.clone());
 
@@ -95,6 +113,18 @@ impl BenchmarkRunner {
         println!("\n{}", style("═══ Multi-Core Tests ═══").bright());
 
         for (i, entry) in benchmarks.iter().enumerate() {
+            if is_interrupted() {
+                pb.finish_and_clear();
+                println!(
+                    "\n{}",
+                    style("Interrupted! Saving partial results...").yellow()
+                );
+                results.calculate_scores();
+                results.metadata.duration = start_time.elapsed().as_secs_f64();
+                self.save_results(&results);
+                return Ok(results);
+            }
+
             let msg = format!("[{}/{}] {}", i + 1, total, entry.name);
             pb.set_message(msg.clone());
 
@@ -186,7 +216,7 @@ impl BenchmarkRunner {
             RayTracingBenchmark, TextProcessingBenchmark,
         };
 
-        vec![
+        let all_benchmarks = vec![
             benchmark_entry!("FileIO", FileIOBenchmark),
             benchmark_entry!("Compression", CompressionBenchmark),
             benchmark_entry!("ImageProcessing", ImageProcessingBenchmark),
@@ -201,7 +231,62 @@ impl BenchmarkRunner {
             benchmark_entry!("MLInference", MLInferenceBenchmark),
             benchmark_entry!("Navigation", NavigationBenchmark),
             benchmark_entry!("ImageFilters", ImageFiltersBenchmark),
-        ]
+        ];
+
+        let available: Vec<&str> = all_benchmarks.iter().map(|b| b.name).collect();
+        let filter_lower: Vec<String> = self
+            .config
+            .category_filter
+            .iter()
+            .flatten()
+            .map(|s| s.to_lowercase())
+            .collect();
+
+        let filtered: Vec<BenchmarkEntry> = if filter_lower.is_empty() {
+            all_benchmarks
+        } else {
+            let mut matched = Vec::new();
+            let mut unmatched = Vec::new();
+
+            for item in &filter_lower {
+                if all_benchmarks
+                    .iter()
+                    .any(|b| b.name.to_lowercase() == *item)
+                {
+                    matched.push(item.clone());
+                } else {
+                    unmatched.push(item.clone());
+                }
+            }
+
+            for item in &unmatched {
+                eprintln!(
+                    "Warning: Category '{}' not found. Available: {}",
+                    item,
+                    available.join(", ")
+                );
+            }
+
+            if matched.is_empty() {
+                eprintln!("No valid categories matched. Running all benchmarks.");
+                all_benchmarks
+            } else {
+                all_benchmarks
+                    .into_iter()
+                    .filter(|b| matched.contains(&b.name.to_lowercase()))
+                    .collect()
+            }
+        };
+
+        if self.config.quick && self.config.category_filter.is_none() {
+            let quick_categories = ["fileio", "compression", "mathematical"];
+            filtered
+                .into_iter()
+                .filter(|b| quick_categories.contains(&b.name.to_lowercase().as_str()))
+                .collect()
+        } else {
+            filtered
+        }
     }
 
     /// Print the benchmark header.

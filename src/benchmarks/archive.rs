@@ -14,6 +14,7 @@ use zip::CompressionMethod;
 use crate::benchmarks::base::{
     calculate_category_score, get_parallel_workers, run_with_iterations, BaseBenchmark,
 };
+use crate::references::ReferenceValues;
 use crate::results::CategoryResult;
 
 /// Archive benchmark.
@@ -354,11 +355,7 @@ impl BaseBenchmark for ArchiveBenchmark {
     fn run_all(&self, iterations: usize, warmup: usize, timeout: u64) -> Result<CategoryResult> {
         let mut results = Vec::new();
         let mut total_duration = 0.0;
-
-        // Reference values (MB/s for create, ops/s for extract - calibrated)
-        // Same reference values used for both single-core and multi-core modes
-        let (zip_create_ref, zip_extract_ref, tar_create_ref, tar_extract_ref) =
-            (30.0, 50.0, 80.0, 150.0);
+        let refs = ReferenceValues::load();
 
         if self.multi_core {
             // Multi-core: parallel archive operations with SAME total work as single-core
@@ -370,7 +367,7 @@ impl BaseBenchmark for ArchiveBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel ZIP Create ({} archives)", num_workers),
-                zip_create_ref,
+                refs.archive.create_zip_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -383,7 +380,7 @@ impl BaseBenchmark for ArchiveBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel ZIP Extract ({} archives)", num_workers),
-                zip_extract_ref,
+                refs.archive.extract_zip_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -395,7 +392,7 @@ impl BaseBenchmark for ArchiveBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel TAR Create ({} archives)", num_workers),
-                tar_create_ref,
+                refs.archive.create_tar_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -408,7 +405,7 @@ impl BaseBenchmark for ArchiveBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel TAR Extract ({} archives)", num_workers),
-                tar_extract_ref,
+                refs.archive.extract_tar_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -429,7 +426,7 @@ impl BaseBenchmark for ArchiveBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "ZIP Create",
-                zip_create_ref,
+                refs.archive.create_zip_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -446,7 +443,7 @@ impl BaseBenchmark for ArchiveBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "ZIP Extract",
-                zip_extract_ref,
+                refs.archive.extract_zip_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -462,7 +459,7 @@ impl BaseBenchmark for ArchiveBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "TAR Create",
-                tar_create_ref,
+                refs.archive.create_tar_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -479,7 +476,7 @@ impl BaseBenchmark for ArchiveBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "TAR Extract",
-                tar_extract_ref,
+                refs.archive.extract_tar_mbps,
                 iterations,
                 warmup,
                 timeout,

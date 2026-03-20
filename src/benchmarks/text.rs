@@ -10,6 +10,7 @@ use std::time::Instant;
 use crate::benchmarks::base::{
     calculate_category_score, get_parallel_workers, run_with_iterations, BaseBenchmark,
 };
+use crate::references::ReferenceValues;
 use crate::results::CategoryResult;
 
 /// Text processing benchmark.
@@ -161,13 +162,10 @@ impl BaseBenchmark for TextProcessingBenchmark {
     fn run_all(&self, iterations: usize, warmup: usize, timeout: u64) -> Result<CategoryResult> {
         let mut results = Vec::new();
         let mut total_duration = 0.0;
+        let refs = ReferenceValues::load();
 
         // Generate test text once (1MB)
         let test_text = Self::generate_test_text(1024);
-
-        // Reference values (KB/s)
-        // Same reference values used for both single-core and multi-core modes
-        let (search_ref, regex_ref, string_ref, encoding_ref) = (10000.0, 5000.0, 8000.0, 5000.0);
 
         if self.multi_core {
             // Multi-core: process multiple full-size texts in parallel (throughput model)
@@ -179,7 +177,7 @@ impl BaseBenchmark for TextProcessingBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Search/Replace ({} texts)", num_workers),
-                search_ref,
+                refs.text_processing.search_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -191,7 +189,7 @@ impl BaseBenchmark for TextProcessingBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Regex ({} texts)", num_workers),
-                regex_ref,
+                refs.text_processing.regex_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -203,7 +201,7 @@ impl BaseBenchmark for TextProcessingBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel String Manipulation ({} texts)", num_workers),
-                string_ref,
+                refs.text_processing.string_ops_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -215,7 +213,7 @@ impl BaseBenchmark for TextProcessingBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 &format!("Parallel Encoding/Decoding ({} texts)", num_workers),
-                encoding_ref,
+                refs.text_processing.string_ops_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -229,7 +227,7 @@ impl BaseBenchmark for TextProcessingBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Search/Replace",
-                search_ref,
+                refs.text_processing.search_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -242,7 +240,7 @@ impl BaseBenchmark for TextProcessingBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Regex Operations",
-                regex_ref,
+                refs.text_processing.regex_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -255,7 +253,7 @@ impl BaseBenchmark for TextProcessingBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "String Manipulation",
-                string_ref,
+                refs.text_processing.string_ops_mbps,
                 iterations,
                 warmup,
                 timeout,
@@ -268,7 +266,7 @@ impl BaseBenchmark for TextProcessingBenchmark {
             let result = run_with_iterations(
                 test_fn,
                 "Encoding/Decoding",
-                encoding_ref,
+                refs.text_processing.string_ops_mbps,
                 iterations,
                 warmup,
                 timeout,

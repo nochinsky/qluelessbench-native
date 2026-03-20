@@ -9,6 +9,8 @@ use qluelessbench_native::config::parse_args;
 use qluelessbench_native::{BenchmarkConfig, BenchmarkRunner};
 
 fn main() -> ExitCode {
+    qluelessbench_native::shutdown::register_handlers();
+
     match run() {
         Ok(_) => ExitCode::SUCCESS,
         Err(e) => {
@@ -19,13 +21,25 @@ fn main() -> ExitCode {
 }
 
 fn run() -> Result<()> {
-    // Parse CLI arguments
     let cli = parse_args();
 
-    // Create configuration from CLI
     let config = BenchmarkConfig::from_cli(cli);
 
-    // Initialize logging if verbose
+    if config.generate_refs {
+        match qluelessbench_native::references::ReferenceValues::save_to_default_location() {
+            Ok(path) => {
+                println!("Default reference values config saved to:");
+                println!("{}", path.display());
+                println!("\nEdit this file to customize reference values for calibration.");
+                return Ok(());
+            }
+            Err(e) => {
+                eprintln!("Error saving reference values config: {}", e);
+                return Err(anyhow::anyhow!("Failed to save config: {}", e));
+            }
+        }
+    }
+
     if config.verbose {
         if let Err(e) = tracing_subscriber::fmt()
             .with_max_level(tracing::Level::DEBUG)
@@ -33,11 +47,18 @@ fn run() -> Result<()> {
         {
             eprintln!("Warning: Failed to initialize logging: {}", e);
         }
+        eprintln!("Press Ctrl+C to interrupt benchmark...");
     }
 
-    // Create runner and execute benchmarks
     let runner = BenchmarkRunner::new(config);
-    let _results = runner.run()?;
+    let result = runner.run();
+
+    if qluelessbench_native::shutdown::is_interrupted() {
+        eprintln!("\nBenchmark interrupted by user. Partial results saved if available.");
+        std::process::exit(0);
+    }
+
+    let _results = result?;
 
     Ok(())
 }
