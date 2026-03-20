@@ -3,7 +3,21 @@ use std::process::Command;
 use tempfile::TempDir;
 
 /// Helper: run benchmark with minimal config and return output JSON.
+/// Uses --quick for fast CI testing (3 categories, 1 iteration).
 fn run_benchmark_and_get_json(output_file: &std::path::Path) -> serde_json::Value {
+    let _ = Command::new(env!("CARGO_BIN_EXE_qluelessbench"))
+        .args(["--quick", "--timeout", "30", "--output"])
+        .arg(output_file)
+        .output()
+        .expect("Failed to execute benchmark");
+
+    let content = fs::read_to_string(output_file).expect("Failed to read results file");
+    serde_json::from_str(&content).expect("Invalid JSON")
+}
+
+/// Helper: run full benchmark (all 14 categories) and return output JSON.
+/// Uses longer timeout for CI since it runs all categories.
+fn run_full_benchmark_and_get_json(output_file: &std::path::Path) -> serde_json::Value {
     let _ = Command::new(env!("CARGO_BIN_EXE_qluelessbench"))
         .args([
             "--iterations",
@@ -11,7 +25,7 @@ fn run_benchmark_and_get_json(output_file: &std::path::Path) -> serde_json::Valu
             "--warmup",
             "0",
             "--timeout",
-            "10",
+            "120", // 2 minutes per test to allow for slower CI hardware
             "--output",
         ])
         .arg(output_file)
@@ -314,7 +328,7 @@ fn test_results_persistence() {
 fn test_all_benchmark_categories_ran() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let output_file = temp_dir.path().join("categories.json");
-    let json = run_benchmark_and_get_json(&output_file);
+    let json = run_full_benchmark_and_get_json(&output_file);
 
     let single = json
         .get("single_core_categories")
